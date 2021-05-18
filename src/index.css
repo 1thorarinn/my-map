@@ -11,3 +11,12 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.mapboxgl-ctrl-group > button {
+  height: 26px!important;
+}
+
+
+.mapbox-gl-draw_combine, .mapbox-gl-draw_uncombine, .mapboxgl-ctrl-attrib-inner {
+  display: none;
+}

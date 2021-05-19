@@ -20,3 +20,9 @@ code {
 .mapbox-gl-draw_combine, .mapbox-gl-draw_uncombine, .mapboxgl-ctrl-attrib-inner {
   display: none;
 }
+
+.mapboxgl-canvas-container {
+
+  height: 60vh;
+
+}

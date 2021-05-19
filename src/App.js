@@ -18,7 +18,7 @@ MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1Y
 
 const dataOrigin = 'http://161.97.167.92:1337/routes'
 const mapTile = 'mapbox://styles/mapbox/streets-v11'
-const user_id = 4;
+const user_id = 12;
 
 
 var bounds = [
@@ -47,7 +47,7 @@ const HomePage = () => {
   const [zoom, setZoom] = useState(3);
   const [clientRoutes, setClientRoutes] = useState([]);
 
-  var Draw = new MapboxGLDraw({
+  const Draw = new MapboxGLDraw({
     displayControlsDefault: true,
     controls: {
       polygon: true,
@@ -55,7 +55,7 @@ const HomePage = () => {
       marker: true,
       trash: true
     }
- });
+  });
 
   
   useEffect(() => { 
@@ -91,6 +91,8 @@ const HomePage = () => {
     map.current.on('load', function () {      
 
       map.current.addControl(Draw, 'top-right');
+      map.current.resize()
+      
 
       map.current.on('move', () => {
         setLng(map.current.getCenter().lng.toFixed(4));
@@ -106,33 +108,29 @@ const HomePage = () => {
         trackUserLocation: true
       }));
 
-
       map.current.addControl(new MapboxGLGeocoder({
         accessToken: MapboxGL.accessToken
       }));
 
     });
 
-    map.current.on('draw.create', createDrawArea);
+    const updateDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }  
     map.current.on('draw.update', updateDrawArea);
+    
+    const createDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }
+    map.current.on('draw.create', createDrawArea);
+    
+    const deleteDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }  
     map.current.on('draw.delete', deleteDrawArea);
-
+    
   }
 
-  const updateDrawArea = (e) => {
-    //checkLineExist(e)
-    var data = Draw.getAll();
-     console.log(data)
+  function parseMapContent(event, data){
+    //console.log(event)
+    localStorage.setItem('userNewRoute', JSON.stringify(data))
   }
 
-  const deleteDrawArea = (e) => {
-    checkLineExist(e)
-  }
 
-  const createDrawArea = (e) => {
-    e.id = 5;
-    checkLineExist(e)
-  }
 
   function checkLineExist(e){
     console.log(e)
@@ -185,44 +183,7 @@ const HomePage = () => {
     return response.json(); // parses JSON response into native JavaScript objects
   }
 
-  function saveRoute(e){
 
-    e.preventDefault()
-
-    postData('http://localhost:1337/routes', {
-        "name": "string",
-        "slug": Math.random(),
-        "description": [
-          {
-            "id": "string",
-            "label": "string",
-            "language": {
-              "id": "string",
-              "name": "string",
-              "code": "string",
-              "published_at": "string",
-              "created_by": "string",
-              "updated_by": "string"
-            },
-            "description": "string"
-          }
-        ],
-        "map_data": {
-          "id": "string",
-          "center_lat": 0,
-          "center_long": 0,
-          "center_zoom": 0,
-          "data": {}
-        }
-      }
-    )
-    .then(data => {
-      console.log(data); // JSON data parsed by `data.json()` call
-    });
-
-    closeModal()  
-
-  }
 
   function getSaveRouteModal(){
     return <Modal
@@ -243,6 +204,47 @@ const HomePage = () => {
       </form>
     </Modal>
   }
+
+  function viewStored(){
+    console.log(JSON.parse(localStorage.getItem('userNewRoute')))
+  }
+
+  function getStored(){
+    return JSON.parse(localStorage.getItem('userNewRoute'))
+  }
+
+  function saveRoute(){
+
+    // Preparing data to be saved
+
+    // 1.- Only a Linestring is allowed!! Not two
+
+    alert('pinga')
+
+    postData('http://161.97.167.92:1337/routes', {
+        "description": [
+          {
+              "label": "sdfgsd",
+              "language": 1,
+              "description": "sdfgsdg"
+          }
+        ],
+        "name": "ghxfghfsdhsdfg",
+        "creator": user_id,
+        "map_data" : {
+          "data" : getStored()
+        }
+
+      }
+    )
+    .then(data => {
+      console.log(data); // JSON data parsed by `data.json()` call
+    });
+
+    closeModal()  
+
+  }
+
 
   const [routeName, setRouteName] = useState('')
 
@@ -266,8 +268,9 @@ const HomePage = () => {
             </div>
         </div>
         <div className="col-md-12 col-lg-4">
-          {getSaveRouteModal()}          
-          <button onClick={openModal}>Create New</button>
+          {getSaveRouteModal()}       
+          <button onClick={viewStored}>[View storage]</button>   
+          <button onClick={saveRoute}>Save Route!!</button>
         </div>
       </div>
     </>

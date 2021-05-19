@@ -132,12 +132,14 @@ const HomePage = () => {
 
 
 
-  function checkLineExist(e){
-    console.log(e)
-    for(var i=0; i < e.features.length; i++){
-      if( e.features[i].geometry.type === 'LineString') return true
+  function checkFeaturesAmount(data, type){
+    let amount = 0
+    for(var i=0; i < data.features.length; i++){
+      if( data.features[i].geometry.type === type){
+        amount++
+      } 
     }
-    return false
+    return amount
   }
 
   function renderRoutesSelector(routes){
@@ -209,7 +211,7 @@ const HomePage = () => {
     console.log(JSON.parse(localStorage.getItem('userNewRoute')))
   }
 
-  function getStored(){
+  function getStoredRoute(){
     return JSON.parse(localStorage.getItem('userNewRoute'))
   }
 
@@ -219,9 +221,27 @@ const HomePage = () => {
 
     // 1.- Only a Linestring is allowed!! Not two
 
-    alert('pinga')
+      let storedRoute = getStoredRoute();
+      let storedLinesAmount = checkFeaturesAmount(storedRoute, 'LineString');
+      let storedPointsAmount = checkFeaturesAmount(storedRoute, 'Point');
 
-    postData('http://161.97.167.92:1337/routes', {
+      if(storedLinesAmount > 1 ){
+
+        alert('You are unable to paint two lines fos a route. You must delete '+(storedLinesAmount-1)+' lines');
+        return false
+        
+      }else if(storedPointsAmount < 1 ){
+
+        alert('You must put, at least, one marker corresponding with the meeting point on the map...');
+        return false
+
+      }else{
+
+      }
+
+ 
+
+      /*postData('http://161.97.167.92:1337/routes', {
         "description": [
           {
               "label": "sdfgsd",
@@ -232,16 +252,16 @@ const HomePage = () => {
         "name": "ghxfghfsdhsdfg",
         "creator": user_id,
         "map_data" : {
-          "data" : getStored()
+          "data" : getStoredRoute()
         }
+      })
+      .then(data => {
+        console.log(data); // JSON data parsed by `data.json()` call
+      });
 
-      }
-    )
-    .then(data => {
-      console.log(data); // JSON data parsed by `data.json()` call
-    });
-
-    closeModal()  
+      closeModal()
+      */
+     
 
   }
 

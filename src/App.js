@@ -16,12 +16,23 @@ import './index.css'
 
 MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg"
 
-const dataOrigin = 'http://161.97.167.92:1337/routes'
+const routesOrigin = 'http://161.97.167.92:1337/routes'
+const polygonsOrigin = 'http://161.97.167.92:1337/polygons'
+const placesOrigin = 'http://161.97.167.92:1337/my-places'
 const mapTile = 'mapbox://styles/mapbox/streets-v11'
 const user_id = 12;
 
+const messages = {
+  chooseRoute : 'Choose a route...'
+}
 
-var bounds = [
+const keys = {
+  chooseRoute : 'Choose a route...'
+}
+
+const placesLimit = 5;
+
+var bounds = [//TODO: automati
   [-25, 53], // Southwest coordinates
   [58, 2] // Northeast coordinates
 ];
@@ -45,8 +56,7 @@ const HomePage = () => {
   const [lng, setLng] = useState(2.68);
   const [lat, setLat] = useState(39.79);
   const [zoom, setZoom] = useState(3);
-  const [clientRoutes, setClientRoutes] = useState([]);
-
+  
   const Draw = new MapboxGLDraw({
     displayControlsDefault: true,
     controls: {
@@ -56,13 +66,32 @@ const HomePage = () => {
       trash: true
     }
   });
-
   
+  const [clientRoutes, setClientRoutes] = useState([]);
   useEffect(() => { 
-    fetch(dataOrigin+'?created_by='+user_id)
+    fetch(routesOrigin+'?created_by='+user_id)
     .then((res) => res.json())
     .then(setClientRoutes); 
   },[user_id]);
+  
+  /*
+  const [clientPlaces, setClientPlaces] = useState([]);
+  useEffect(() => { 
+    fetch(placesOrigin+'?created_by='+user_id)
+    .then((res) => res.json())
+    .then(setClientPlaces); 
+  },[user_id]);  
+  
+  const [clientPolygons, setClientPolygons] = useState([]);
+  useEffect(() => { 
+    fetch(polygonsOrigin+'?created_by='+user_id)
+    .then((res) => res.json())
+    .then(setClientPolygons); 
+  },[user_id]);
+  */
+  //let polygonsCount = clientPolygons.length;
+
+  //console.log(polygonsCount)
 
 
   useEffect(() => {
@@ -91,8 +120,7 @@ const HomePage = () => {
     map.current.on('load', function () {      
 
       map.current.addControl(Draw, 'top-right');
-      map.current.resize()
-      
+      map.current.resize()      
 
       map.current.on('move', () => {
         setLng(map.current.getCenter().lng.toFixed(4));
@@ -109,30 +137,47 @@ const HomePage = () => {
       }));
 
       map.current.addControl(new MapboxGLGeocoder({
-        accessToken: MapboxGL.accessToken
+        accessToken: MapboxGL.accessToken,
+        marker: false
       }));
 
     });
 
-    const updateDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }  
+    const updateDrawArea = (e) => { setStorage('currentMapData', Draw.getAll()) }  
     map.current.on('draw.update', updateDrawArea);
     
-    const createDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }
+    const createDrawArea = (e) => { setStorage('currentMapData', Draw.getAll()) }
     map.current.on('draw.create', createDrawArea);
     
-    const deleteDrawArea = (e) => { parseMapContent(e, Draw.getAll()) }  
+    const deleteDrawArea = (e) => { setStorage('currentMapData', Draw.getAll()) }  
     map.current.on('draw.delete', deleteDrawArea);
     
   }
 
-  function parseMapContent(event, data){
-    //console.log(event)
-    localStorage.setItem('userNewRoute', JSON.stringify(data))
+  function setStorage(key, data, type='json'){
+    return ( type === 'json')
+      ? localStorage.setItem(key, JSON.stringify(data))
+      : localStorage.setItem(key, data)
   }
 
+  function getStorage(key, type='json'){
+    return (type === 'json')
+      ? JSON.parse(localStorage.getItem(key))
+      : localStorage.getItem(key);
+  }
 
+  function viewStored(key, type='json'){
+    console.log(JSON.parse(localStorage.getItem(key)))
+    return true;
+  }
 
-  function checkFeaturesAmount(data, type){
+  function launchToast(message, doContinue=false){
+    alert(message);
+    return doContinue
+  }
+
+  // Checking stored LiveMap
+  function checkFeaturesAmount(data=[], type='Point'){
     let amount = 0
     for(var i=0; i < data.features.length; i++){
       if( data.features[i].geometry.type === type){
@@ -144,7 +189,7 @@ const HomePage = () => {
 
   function renderRoutesSelector(routes){
     var options = [
-      { value: '', label: 'Choose a route...' }
+      { value: '', label: messages.chooseRoute }
     ]
     for(var i = 0; i < routes.length; i++){
       options.push({ value: routes[i].id.toString(), label: routes[i].name })
@@ -174,17 +219,17 @@ const HomePage = () => {
       mode: 'cors', // no-cors, *cors, same-origin
       cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
       credentials: 'same-origin', // include, *same-origin, omit
-      headers: {
-        'Content-Type': 'application/json'
+      headers: { 'Content-Type': 'application/json'
         // 'Content-Type': 'application/x-www-form-urlencoded',
       },
       redirect: 'follow', // manual, *follow, error
       referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
       body: JSON.stringify(data) // body data type must match "Content-Type" header
+    }).catch(function(error) {
+      console.log(error);
     });
     return response.json(); // parses JSON response into native JavaScript objects
   }
-
 
 
   function getSaveRouteModal(){
@@ -207,64 +252,142 @@ const HomePage = () => {
     </Modal>
   }
 
-  function viewStored(){
-    console.log(JSON.parse(localStorage.getItem('userNewRoute')))
-  }
-
-  function getStoredRoute(){
-    return JSON.parse(localStorage.getItem('userNewRoute'))
-  }
-
   function saveRoute(){
 
-    // Preparing data to be saved
+    // Analizing the data to save :)
 
-    // 1.- Only a Linestring is allowed!! Not two
+      let storedRoute = getStorage('currentMapData');
+      if(storedRoute){
 
-      let storedRoute = getStoredRoute();
-      let storedLinesAmount = checkFeaturesAmount(storedRoute, 'LineString');
-      let storedPointsAmount = checkFeaturesAmount(storedRoute, 'Point');
+        // 1.- Only a Linestring is allowed!! Not two      
 
-      if(storedLinesAmount > 1 ){
+          let storedLinesAmount = checkFeaturesAmount(storedRoute, 'LineString');
+          if(storedLinesAmount > 1 ){
+            if(!launchToast('You are unable to draw two lines for a route. You must delete '+(storedLinesAmount-1)+' lines')) return false
+          }else if(storedLinesAmount === 0){
+            if(!launchToast('You must draw one route, at least')) return false
+          }          
 
-        alert('You are unable to paint two lines fos a route. You must delete '+(storedLinesAmount-1)+' lines');
-        return false
-        
-      }else if(storedPointsAmount < 1 ){
+        // 2.- Now you will set the first location (meeting-point)
 
-        alert('You must put, at least, one marker corresponding with the meeting point on the map...');
-        return false
+          let storedPointsAmount = checkFeaturesAmount(storedRoute, 'Point');
+          if(storedPointsAmount < 1 ){
+            if (!window.confirm("You don't have addressed any Place to your route. We encourage you to put, at least, one Place Marker ;)' Do you really want to save?")) {
+              if(!launchToast('You cancel to save this Route')) return false
+            }
+          }else if(storedPointsAmount > placesLimit ){
+            if(!launchToast('You have passed the amount limit of Places on your route. Please, the limit are '+placesLimit)) return false
+          }
 
       }else{
-
+        if(!launchToast("You haven't created a route. Please, print at least a Route!")) return false
       }
 
- 
+      launchToast("You gonna save the route!!!!")
 
-      /*postData('http://161.97.167.92:1337/routes', {
-        "description": [
-          {
-              "label": "sdfgsd",
-              "language": 1,
-              "description": "sdfgsdg"
-          }
-        ],
-        "name": "ghxfghfsdhsdfg",
-        "creator": user_id,
-        "map_data" : {
-          "data" : getStoredRoute()
-        }
-      })
-      .then(data => {
-        console.log(data); // JSON data parsed by `data.json()` call
-      });
-
-      closeModal()
-      */
-     
+      processSave(storedRoute)     
 
   }
 
+  function postRoute(key, label="Your Route", description="Your route description..."){
+
+    let postRouteData = {
+      "name": label,
+      "creator": user_id,
+      "description": [
+        {
+          "language": 1,
+          "label": label,
+          "description": description
+        }
+      ],
+      "map_data" : {
+        "data" : getStorage('currentMapData')
+      }
+    }
+    
+    postData('http://161.97.167.92:1337/routes', postRouteData )
+    .then(data => {
+      console.log('Route was posted successful ;)')
+      setStorage(key, data )
+    });
+
+    let savedKey = getStorage(key)
+    return savedKey.id
+
+  }
+
+  function postPlace(parent, key, name="Your Place", description="Your place description...", placeFeatures, markerType=3){
+
+    let postPlaceData = {
+      "name": name,
+      "creator": user_id,
+      "parent_route" : parent,
+      "description": [
+        {
+          "language": 1,
+          "label": name,
+          "description": description
+        }
+      ],
+      "map_data": {
+        "center_lat": 0,
+        "center_long": 0,
+        "center_zoom": 0,
+        "data": JSON.stringify(placeFeatures)
+      }
+    }    
+    
+    postData('http://161.97.167.92:1337/my-places', postPlaceData )
+    .then(data => {
+      console.log('Place '+key+' posted successful ;)')
+      setStorage(key, data )
+    });
+
+    let savedKey = getStorage(key)
+    return true
+
+  }
+
+  function postPolygon(parent, key, name="Your Polygon", description="Your place description...", polygonFeatures){
+
+    let postRouteData = {
+      "name": name,
+      "creator": user_id,
+      "parent_route" : parent,
+      "map_data": {
+        "id": "string",
+        "center_lat": 0,
+        "center_long": 0,
+        "center_zoom": 0,
+        "data": JSON.stringify(polygonFeatures)
+      },
+    }
+    
+    postData('http://161.97.167.92:1337/polygons', postRouteData )
+    .then(data => {
+      console.log('Polygon '+key+' posted successful ;)')
+      setStorage(key, data)
+    });
+
+    let savedKey = getStorage(key)
+
+    return false;
+
+  }
+
+  function processSave(storedRoute){
+    let routeId = postRoute('savedRoute', "New Route", "Your new route first description...")
+    if(routeId){
+      for(var i=0; i < storedRoute.features.length; i++){
+        if(storedRoute.features[i].geometry.type === 'Point'){
+          postPlace(routeId, storedRoute.features[i].id, "Your Place", "Your place description...", storedRoute.features[i])
+        }else if(storedRoute.features[i].geometry.type === 'Polygon'){
+          postPolygon(routeId, storedRoute.features[i].id, "Your Polygon", "Your place description...", storedRoute.features[i])
+        }
+      }
+    }
+  }
 
   const [routeName, setRouteName] = useState('')
 
@@ -279,7 +402,7 @@ const HomePage = () => {
                 </div>
                 {renderRoutesSelector(clientRoutes)}
                 <button>Edit route data</button><button>Editing route</button> 
-                <div class="calculation-box">
+                <div className="calculation-box">
                   <p>Draw a polygon using the draw tools.</p>
                   <div id="calculated-area"></div>
                 </div>
@@ -289,7 +412,7 @@ const HomePage = () => {
         </div>
         <div className="col-md-12 col-lg-4">
           {getSaveRouteModal()}       
-          <button onClick={viewStored}>[View storage]</button>   
+          <button onClick={viewStored('currentMapData')}>[View storage]</button>   
           <button onClick={saveRoute}>Save Route!!</button>
         </div>
       </div>

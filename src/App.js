@@ -12,6 +12,7 @@ import './index.css'
 
 const host ='http://161.97.167.92:1337';
 MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg"
+const MapboxLanguage = require('@mapbox/mapbox-gl-language');
 
 const routesOrigin = host+'/routes'
 const polygonsOrigin = host+'/polygons'
@@ -25,20 +26,9 @@ const messages = {
   chooseRoute : 'Choose a route...'
 }
 
-//XXX: NOW IS MORE OR LESS EUROPE!!!
-const bounds = [
-  [-25, 53], // Southwest coordinates
-  [ 58, 2 ]  // Northeast coordinates
-];
-
-const center = {
-  lat: 39.79,
-  lng: 2.68,
-  zoom: 3
-}
-
 const customStyles = {
   content : {
+    //width                 : '45%',
     top                   : '50%',
     left                  : '50%',
     right                 : 'auto',
@@ -48,7 +38,7 @@ const customStyles = {
   }
 }
 
-var MapboxLanguage = require('@mapbox/mapbox-gl-language');
+
 
 const Draw = new MapboxGLDraw({
   displayControlsDefault: true,
@@ -60,16 +50,19 @@ const Draw = new MapboxGLDraw({
   }
 });
 
-const HomePage = () => {  
+const HomePage = () => {
 
+  // Map Settings
   const map = useRef(null);
   const mapContainer = useRef(null);
+  const mapOptions = getStorage('currentMapOptions') ?? {
+    lat: 39.79, lng: 2.68, zoom: 3
+  }
+  const [lat, setMapLat] = useState(mapOptions.lat);// Mallorca is the map center ;)
+  const [lng, setMapLng] = useState(mapOptions.lng);// Mallorca is map center ;)
+  const [zoom, setMapZoom] = useState(mapOptions.zoom);
 
-  // The main center of the map
-  const [lat, setMapLat] = useState(center.lat);// Mallorca is the map center ;)
-  const [lng, setMapLng] = useState(center.lng);// Mallorca is map center ;)
-  const [zoom, setMapZoom] = useState(center.zoom);
-
+  // NEW Route settings
   const [routeName, setRouteName] = useState('')
   const [routeDescription, setRouteDescription] = useState('')
   const [routeGeoData, setRouteGeoData] = useState([])
@@ -78,12 +71,13 @@ const HomePage = () => {
   
   const [newRouteId, setNewRouteId] = useState('0')
 
+  const [selectedRoute, setSelectedRoute] = useState(getStorage('currentMap') ?? [])
+
   var subtitle, subtitle2;
 
   function afterOpenModal() {
     subtitle.style.color = '#000';
   }
-
 
   if (typeof(window) !== 'undefined') {
     Modal.setAppElement('body')
@@ -99,25 +93,22 @@ const HomePage = () => {
     loadMap()
   },[]);
 
-
-
   function loadMap(){
     
-    if (map.current) return; // initialize map only once
+    if (map.current) return;
 
     map.current = new MapboxGL.Map({
       container: mapContainer.current,
       containerStyle: {
         position:'absolute',
-        top:0,
-        bottom:0,
+        top: 0,
+        bottom: 0,
         width:'100%',
         minHeight: '1000px'
       },
       style: mapTile,
-      center: [lng, lat],
-      zoom: zoom,
-      //maxBounds: bounds // Sets bounds as max
+      center: [ lng, lat ],
+      zoom: zoom
     });
 
     map.current.on('load', function () {      
@@ -131,9 +122,14 @@ const HomePage = () => {
       }));      
 
       map.current.on('move', () => {
-        setMapLng(map.current.getCenter().lng.toFixed(4));
-        setMapLat(map.current.getCenter().lat.toFixed(4));
+        setMapLat(map.current.getCenter().lat);
+        setMapLng(map.current.getCenter().lng);        
         setMapZoom(Math.round(map.current.getZoom()));
+        setStorage('currentMapOptions',{
+          lat: map.current.getCenter().lat,
+          lng: map.current.getCenter().lng,
+          zoom: map.current.getZoom()
+        })
       });
 
       map.current.on('draw.create', createDrawArea);
@@ -143,19 +139,23 @@ const HomePage = () => {
       //map.current.addControl(new MapboxGL.FullscreenControl());
       //map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
 
+      // Draw temporary stored map!!
+      if(getStorage('currentMap')){
+        Draw.add(getStorage('currentMap'));
+      }
+
     });
 
-    const createDrawArea = (e) => { storedMap(e, Draw.getAll()) }
-    const updateDrawArea = (e) => { storedMap(e, Draw.getAll()) }    
-    const deleteDrawArea = (e) => { storedMap(e, Draw.getAll()) }   
+    const createDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }
+    const updateDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }    
+    const deleteDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }   
 
   }
 
-  function storedMap(e, data){
+  function setStoredMap(e, data){
     setStorage('currentMap', data)
     setRouteGeoData(data)
   }
-
 
   function setStorage(key, data, type='json'){
     return ( type === 'json')
@@ -196,9 +196,37 @@ const HomePage = () => {
 
 
   function openModal() {
-    setModalStatus(true);
-  }
+    if(!routeGeoData.features) return false
+    // Analizing the data to save :)
+    if(routeGeoData.features.length > 0){
 
+      // 1.- Only a Linestring is allowed!! Not two      
+
+        let storedLinesAmount = checkFeaturesAmount(routeGeoData, 'LineString');
+        if(storedLinesAmount > 1 ){
+          if(!launchToast('You are unable to draw two lines for a route. You must delete '+(storedLinesAmount-1)+' lines')) return false
+        }else if(storedLinesAmount === 0){
+          if(!launchToast('You must draw one route, at least')) return false
+        }          
+
+      // 2.- Now you will set the first location (meeting-point)
+
+        let storedPointsAmount = checkFeaturesAmount(routeGeoData, 'Point');
+        if(storedPointsAmount < 1 ){
+          if (!window.confirm("You don't have addressed any Place to your route. We encourage you to put, at least, one Place Marker ;)' Do you really want to save?")) {
+            if(!launchToast('You cancel to save this Route')) return false
+          }
+        }else if(storedPointsAmount > placesLimit ){
+          if(!launchToast('You have passed the amount limit of Places on your route. Please, the limit are '+placesLimit)) return false
+        }
+
+    }else if(!launchToast("You haven't created a route. Please, print at least a Route!")){
+
+    }else{
+      setModalStatus(true);
+    }
+
+  }
 
   function closeModal(){
     setModalStatus(false);
@@ -239,76 +267,47 @@ const HomePage = () => {
     >
       <h2 ref={_subtitle => (subtitle = _subtitle)}>Save your route</h2>
       <label ref={_subtitle2 => (subtitle2 = _subtitle2)}>Please, include the basic info...</label>
-      <form>
-        <div className='table'>
-          <div className='row'>
-            <div className='col-12'>
-              <label>Route Name</label>
-            </div>
-            <div className='col-12'>
-              <input type='text' id='route-name' onChange={e=>{setRouteName(e.target.value)}}/>
-            </div>
+      <div className='table'>
+        <div className='row'>
+          <div className='col-12'>
+            <label>Route Name</label>
           </div>
-          <div className='row'>
-            <div className='col-12'>
-            <label>Route Description</label>
-            </div>
-            <div className='col-12'>
-            <textarea id='route-description' onChange={e=>{setRouteDescription(e.target.value)}}/>
-            </div>
+          <div className='col-12'>
+            <input type='text' id='route-name' onChange={e=>{setRouteName(e.target.value)}}/>
           </div>
-
-          <div className='row'>
-            <div className='col-6'>
-              <button onClick={closeModal}>Cancel</button>
-            </div>
-            <div className='col-6'>
-              <button onClick={saveRoute}>Save</button>
-            </div>
-          </div>        
         </div>
-      </form>
+        <div className='row'>
+          <div className='col-12'>
+          <label>Route Description</label>
+          </div>
+          <div className='col-12'>
+          <textarea id='route-description' onChange={e=>{setRouteDescription(e.target.value)}}/>
+          </div>
+        </div>
+
+        <div className='row'>
+          <div className='col-6'>
+            <button onClick={closeModal}>Cancel</button>
+          </div>
+          <div className='col-6'>
+            <button onClick={saveRoute}>Save</button>
+          </div>
+        </div>        
+      </div>
     </Modal>
   }
 
-
   function saveRoute(){      
-    
+
+    console.log('Saving the GeoJSON map data!!!')
     console.log('Route name: '+routeName)
     console.log('Route description: '+routeDescription)
     console.log(routeGeoData)
 
-    // Analizing the data to save :)
-    if(routeGeoData.length > 0){
-
-      // 1.- Only a Linestring is allowed!! Not two      
-
-        let storedLinesAmount = checkFeaturesAmount(routeGeoData, 'LineString');
-        if(storedLinesAmount > 1 ){
-          if(!launchToast('You are unable to draw two lines for a route. You must delete '+(storedLinesAmount-1)+' lines')) return false
-        }else if(storedLinesAmount === 0){
-          if(!launchToast('You must draw one route, at least')) return false
-        }          
-
-      // 2.- Now you will set the first location (meeting-point)
-
-        let storedPointsAmount = checkFeaturesAmount(routeGeoData, 'Point');
-        if(storedPointsAmount < 1 ){
-          if (!window.confirm("You don't have addressed any Place to your route. We encourage you to put, at least, one Place Marker ;)' Do you really want to save?")) {
-            if(!launchToast('You cancel to save this Route')) return false
-          }
-        }else if(storedPointsAmount > placesLimit ){
-          if(!launchToast('You have passed the amount limit of Places on your route. Please, the limit are '+placesLimit)) return false
-        }
-
-    }else{
-      if(!launchToast("You haven't created a route. Please, print at least a Route!")) return false
-    }
-
     subtitle2.style.color = 'green';
-    //launchToast("Everything is ok. We gonna save the route. Please wait...")
+    launchToast("Everything is ok. We gonna save the route. Please wait...")
 
-    processSave(routeGeoData)
+    return processSave()
 
   }
 
@@ -338,13 +337,11 @@ const HomePage = () => {
       setNewRouteId(data.id)
     });
 
-    console(newRouteId);
-
   }
 
-  function postPlace(key, placeFeatures, markerType=3, i){
+  function setNewPostPlace(key, placeFeatures, markerType=3, i){
 
-    let postPlaceData = {
+    let setNewPostPlaceData = {
       "name": routeName+' Place '+i,
       "creator": user_id,
       "parent_route" : newRouteId,
@@ -363,14 +360,14 @@ const HomePage = () => {
       }
     }    
     
-    postData(host+'/my-places', postPlaceData )
+    postData(host+'/my-places', setNewPostPlaceData )
     .then(data => {
       console.log('Place '+key+' posted successful ;)')
     });
 
   }
 
-  function postPolygon(key, polygonFeatures, i){
+  function setNewPostPolygon(key, polygonFeatures, i){
 
     let postRouteData = {
       "name": routeName+' Warning Polygon '+i,
@@ -392,19 +389,56 @@ const HomePage = () => {
 
   }
 
-  function processSave(storedRoute){
+  function processSave(){
     postRoute()
-    if(newRouteId){
-      for(var i=0; i < storedRoute.features.length; i++){
-        if(storedRoute.features[i].geometry.type === 'Point'){
-          postPlace(storedRoute.features[i].id, storedRoute, i)
-        }else if(storedRoute.features[i].geometry.type === 'Polygon'){
-          postPolygon(storedRoute.features[i].id, storedRoute, i)
+    /*if(newRouteId){
+      for(var i=0; i < routeGeoData.features.length; i++){
+        if(routeGeoData.features[i].geometry.type === 'Point'){
+          setNewPostPlace(routeGeoData.features[i].id, routeGeoData, i)
+        }else if(routeGeoData.features[i].geometry.type === 'Polygon'){
+          setNewPostPolygon(routeGeoData.features[i].id, routeGeoData, i)
         }
       }
-    }
+    }*/
+    let endData = []
+    setStorage('currentMap', endData)
+    setRouteGeoData(endData)
+    loadMap()
     closeModal()
-  } 
+    return true;
+  }
+
+  const [clientPlaces, setClientPlaces] = useState([]);
+  useEffect(() => { 
+    fetch(placesOrigin+'?created_by='+user_id)
+    .then((res) => res.json())
+    .then(setClientPlaces); 
+  },[user_id]);  
+  
+  const [clientPolygons, setClientPolygons] = useState([]);
+  useEffect(() => { 
+    fetch(polygonsOrigin+'?created_by='+user_id)
+    .then((res) => res.json())
+    .then(setClientPolygons); 
+  },[user_id]);
+
+  function setRoute(e){
+    console.log(selectedRoute)
+  }
+
+  function renderRoutesSelector(routes){
+    var options = [{ value: '0', label: messages.chooseRoute }]
+    for(var i = 0; i < routes.length; i++){
+      options.push({ value: routes[i].id.toString(), label: routes[i].name })
+    }
+    return <Select
+      name="route"
+      value={selectedRoute}
+      options={options}
+      closeMenuOnSelect={true}
+      onChange={e=>{setSelectedRoute(e.value)}}
+    />
+  }
 
   return (
     <>
@@ -412,10 +446,8 @@ const HomePage = () => {
         <div className="col-lg-8 col-md-12">
             <div>
               <div>
-                {/*<div className="sidebar">
-                  Longitude: {lng} | Latitude: {lat} | Zoom: {zoom}
-                </div>
-                {renderRoutesSelector(clientRoutes)}*/}
+                {/*<div className="sidebar">Longitude: {lng.toFixed(4)} | Latitude: {lat.toFixed(4)} | Zoom: {Math.round(zoom)}</div>*/}
+                {/*renderRoutesSelector(clientRoutes)*/}
                 <button color="success" disabled="" onClick={openModal}>Save route</button>
                 <div className="calculation-box">                  
                   <div id="calculated-area"></div>
@@ -436,34 +468,3 @@ const HomePage = () => {
 };
 
 export default memo(HomePage)
-
-  /*const [clientPlaces, setClientPlaces] = useState([]);
-  useEffect(() => { 
-    fetch(placesOrigin+'?created_by='+user_id)
-    .then((res) => res.json())
-    .then(setClientPlaces); 
-  },[user_id]);  
-  
-  const [clientPolygons, setClientPolygons] = useState([]);
-  useEffect(() => { 
-    fetch(polygonsOrigin+'?created_by='+user_id)
-    .then((res) => res.json())
-    .then(setClientPolygons); 
-  },[user_id]);
-
-  function setRoute(e){
-    console.log(e)
-  }
-
-    function renderRoutesSelector(routes){
-    var options = [{ value: '0', label: messages.chooseRoute }]
-    for(var i = 0; i < routes.length; i++){
-      options.push({ value: routes[i].id.toString(), label: routes[i].name })
-    }
-    return <Select
-      name="route"
-      options={options} onChange={e=>{setRoute(e)}}
-    />
-  }
-
-  */

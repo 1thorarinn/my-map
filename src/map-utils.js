@@ -12,10 +12,14 @@ export function getStorage(key, type='json'){
         : localStorage.getItem(key);
 }
 
-export function getRouteLine(data=[], type='Point'){
+export function removeStorage(key, type='json'){
+    return localStorage.removeItem(key);
+}
+
+export function getRouteType(data=[], type='Point'){
     for(var i=0; i < data.features.length; i++){
         if( data.features[i].geometry.type === type){
-        return data
+            return data.features[i]
         } 
     }
 }
@@ -43,7 +47,7 @@ export const customStyles = {
 }
 
 export const messages = {
-    chooseRoute : 'Choose a route...'
+    chooseRoute : 'Create a route...'
 }
 
 // Checking stored LiveMap
@@ -60,18 +64,18 @@ export function checkFeaturesAmount(data=[], type='Point'){
 export async function postData(url = '', data = {}) {
     // Opciones por defecto estan marcadas con un *
     const response = await fetch(url, {
-      method: 'POST', // *GET, POST, PUT, DELETE, etc.
-      mode: 'cors', // no-cors, *cors, same-origin
-      cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
-      credentials: 'same-origin', // include, *same-origin, omit
-      headers: { 'Content-Type': 'application/json'
+        method: 'POST', // *GET, POST, PUT, DELETE, etc.
+        mode: 'cors', // no-cors, *cors, same-origin
+        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        credentials: 'same-origin', // include, *same-origin, omit
+        headers: { 'Content-Type': 'application/json'
         // 'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      redirect: 'follow', // manual, *follow, error
-      referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
-      body: JSON.stringify(data) // body data type must match "Content-Type" header
+        },
+        redirect: 'follow', // manual, *follow, error
+        referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+        body: JSON.stringify(data) // body data type must match "Content-Type" header
     }).catch(function(error) {
-      console.log(error);
+        console.log(error);
     });
     return response.json(); // parses JSON response into native JavaScript objects
-  }
+}

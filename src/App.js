@@ -5,7 +5,7 @@ import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder';
 
 import MapboxGL from 'mapbox-gl';
 
-import { setStorage, getStorage, getRouteLine, Draw, customStyles, messages, checkFeaturesAmount, postData } from './map-utils.js';
+import { setStorage, getStorage, getRouteType, Draw, customStyles, messages, removeStorage, checkFeaturesAmount, postData } from './map-utils.js';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
@@ -21,8 +21,9 @@ const polygonsOrigin = host+'/polygons'
 const placesOrigin = host+'/my-places'
 
 const mapTile = 'mapbox://styles/mapbox/streets-v11'
+
+// Map vars
 const placesLimit = 6;
-const user_id = 12;
 
 const HomePage = () => {
   
@@ -31,45 +32,47 @@ const HomePage = () => {
   // Map Settings
   const map = useRef(null);
   const mapContainer = useRef(null);
-  const mapOptions = getStorage('currentMapOptions') ?? {
+  const currentMapOpts = getStorage('currentMapOptions') ?? {
     lat: 39.79, lng: 2.68, zoom: 3
   }
-  const [lat, setMapLat] = useState(mapOptions.lat);// Mallorca is the map center ;)
-  const [lng, setMapLng] = useState(mapOptions.lng);// Mallorca is map center ;)
-  const [zoom, setMapZoom] = useState(mapOptions.zoom);
+  const [focusLat,  setMapLat]  = useState(currentMapOpts.lat);
+  const [focusLng,  setMapLng]  = useState(currentMapOpts.lng);
+  const [focusZoom, setMapZoom] = useState(currentMapOpts.zoom);
 
-  // NEW Route settings
+  // Loading all the CMS client routes....
+  const [clientRoutes, setClientRoutes] = useState([]);
+  const [mapMode, setMapMode] = useState('creation')
+
+  const [currentRoute, setCurrentRoute] = useState([]);
+  
+
+  const [selectedGeoRoute, setSelectedGeoRoute] = useState(getStorage('selectedRoute') ?? [])
+
+    // NEW Route settings
+  const [userId, setUserId] = useState(12)
+  const [newRouteId, setNewRouteId] = useState(0)
   const [routeName, setRouteName] = useState('')
   const [routeDescription, setRouteDescription] = useState('')
   const [routeGeoData, setRouteGeoData] = useState(getStorage('currentMap') ?? {features:{}})
   const [modalStatus, setModalStatus] = useState(false);  
-  const [clientRoutes, setClientRoutes] = useState([]);
-  
-  const [newRouteId, setNewRouteId] = useState(0)
-
-  const [selectedRoute, setSelectedRoute] = useState(getStorage('currentMap') ?? [])
-
-  
-
+  //const [sessionTimestamp, setSessionTimestamp] = useState(Date.now())
 
   if (typeof(window) !== 'undefined') {
     Modal.setAppElement('body')
   }
 
   useEffect(() => { 
-    fetch(routesOrigin+'?created_by='+user_id)
+    fetch(routesOrigin+'?created_by='+userId)
     .then((res) => res.json())
     .then(setClientRoutes); 
-  },[user_id]);
+  },[userId]);
 
   useEffect(() => {
     loadMap()
   },[]);
 
-  function loadMap(){
-    
+  function loadMap(){    
     if (map.current) return;
-
     map.current = new MapboxGL.Map({
       container: mapContainer.current,
       containerStyle: {
@@ -80,16 +83,16 @@ const HomePage = () => {
         minHeight: '1000px'
       },
       style: mapTile,
-      center: [ lng, lat ],
-      zoom: zoom,
+      center: [ focusLng, focusLat ],
+      zoom: focusZoom,
       minZoom: 4,
       maxZoom: 18
     });
 
     map.current.on('load', function () {      
 
+      map.current.resize()
       map.current.addControl(Draw, 'top-left');
-      map.current.resize()      
 
       map.current.addControl(new MapboxGLGeocoder({
         accessToken: MapboxGL.accessToken,
@@ -116,6 +119,7 @@ const HomePage = () => {
       //map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
 
       // Draw temporary stored map!!
+
       if(getStorage('currentMap')){
         Draw.add(getStorage('currentMap'));
       }
@@ -126,6 +130,11 @@ const HomePage = () => {
     const updateDrawArea = (e) => { setStoredMap(e.type, Draw.getAll()) }    
     const deleteDrawArea = (e) => { setStoredMap(e.type, Draw.getAll()) }   
 
+  }
+
+  function resetMap(){
+    removeStorage('currentMap')
+    Draw.deleteAll()
   }
 
   function setStoredMap(e, data){
@@ -141,8 +150,6 @@ const HomePage = () => {
 
   // Modal control
   function openModal() {
-
-    console.log(routeGeoData)
 
     if(routeGeoData === []) return false
 
@@ -241,16 +248,20 @@ const HomePage = () => {
   }
 
   function processSave(){
-    setNewPostRoute()   
-    closeModal()
+    if(mapMode === 'creation'){
+      setNewPostRoute()   
+      closeModal()
+    }else if(mapMode === 'edition'){ 
+      alert('Please, wait the updating feature!! ^__^!')
+    }
+
     return true;
   }
 
-  function setNewPostRoute(){
-
-    let setNewPostRouteData = {
+  function setNewPostRoute(){    
+    postData(host+'/routes', {
       "name": routeName,
-      "creator": user_id,
+      "creator": userId,
       "description": [
         {
           "language": 1,
@@ -259,35 +270,34 @@ const HomePage = () => {
         }
       ],
       "map_data" : {
-        "center_lat": lat,
-        "center_long": lng,
-        "center_zoom": zoom,
-        "data" : JSON.stringify(getRouteLine(routeGeoData))
+        "center_lat": focusLat,
+        "center_long": focusLng,
+        "center_zoom": focusZoom,
+        "data" : getRouteType(routeGeoData, 'LineString')
       }
-    }
-    
-    postData(host+'/routes', setNewPostRouteData )
+    } )
     .then(data => {
       console.log('Route was posted successful ;)')
       if(data.id !== '0'){
         setNewRouteId(data.id)
         for(var i=0; i < routeGeoData.features.length; i++){
+
           if(routeGeoData.features[i].geometry.type === 'Point'){
-            setNewPostPlace(data.id, routeGeoData.features[i].id, routeGeoData, i)
+            setNewPostPlace(data.id, routeGeoData.features[i].id, routeGeoData.features[i],3, i)
+
           }else if(routeGeoData.features[i].geometry.type === 'Polygon'){
-            setNewPostPolygon(data.id, routeGeoData.features[i].id, routeGeoData, i)
+            setNewPostPolygon(data.id, routeGeoData.features[i].id, routeGeoData.features[i], i)
+
           }
         }
       }
     });
-
   }
 
-  function setNewPostPlace(routeId, key, placeFeatures, markerType=3, i){
-
-    let setNewPostPlaceData = {
+  function setNewPostPlace(routeId, key, placeFeatures, markerType=3, i){    
+    postData(host+'/my-places', {
       "name": routeName+' Place '+routeId+'-'+i,
-      "creator": user_id,
+      "creator": userId,
       "parent_route" : routeId,
       "description": [
         {
@@ -297,71 +307,110 @@ const HomePage = () => {
         }
       ],
       "map_data": {
-        "center_lat": lat,
-        "center_long": lng,
-        "center_zoom": zoom,
-        "data": JSON.stringify(placeFeatures)
+        "center_lat": focusLat,
+        "center_long": focusLng,
+        "center_zoom": focusZoom,
+        "data": placeFeatures
       }
-    }    
-    
-    postData(host+'/my-places', setNewPostPlaceData )
+    } )
     .then(data => {
       console.log('Place '+key+' posted successful ;)')
     });
-
   }
 
   function setNewPostPolygon(routeId, key, polygonFeatures, i){
-
-    let setNewPostRouteData = {
+    postData(host+'/polygons', {
       "name": routeName+' Warning '+routeId+'-'+i,
-      "creator": user_id,
+      "creator": userId,
       "parent_route" : routeId,
       "map_data": {
-        "id": "string",
-        "center_lat": lat,
-        "center_long": lng,
-        "center_zoom": zoom,
-        "data": JSON.stringify(polygonFeatures)
+        "center_lat": focusLat,
+        "center_long": focusLng,
+        "center_zoom": focusZoom,
+        "data": polygonFeatures
       },
-    }
-    
-    postData(host+'/polygons', setNewPostRouteData )
+    } )
     .then(data => {
       console.log('Polygon '+key+' posted successful ;)')
     });
+  }
+
+  function updateEditRoute(id, data){
 
   }
 
-  const [clientPlaces, setClientPlaces] = useState([]);
-  useEffect(() => { 
-    fetch(placesOrigin+'?created_by='+user_id)
-    .then((res) => res.json())
-    .then(setClientPlaces); 
-  },[user_id]);  
-  
-  const [clientPolygons, setClientPolygons] = useState([]);
-  useEffect(() => { 
-    fetch(polygonsOrigin+'?created_by='+user_id)
-    .then((res) => res.json())
-    .then(setClientPolygons); 
-  },[user_id]);
+  function updateEditPolyline(id, data){
+    
+  }
 
-  function setRoute(e){
-    console.log(selectedRoute)
+  function updateEditPolygon(id, data){
+    
+  }
+
+  function setRoute(value){
+
+    fetch(routesOrigin+'/'+value)
+      .then((res) => res.json())
+      .catch(error => console.error('Error:', error))
+      .then(response => {
+
+        setSelectedGeoRoute(value);
+        setStorage('selectedRoute', value)
+
+        resetMap()
+
+        if(response){
+
+          setStorage('selectedGeoRoute', response.map_data.data)
+
+          map.current.flyTo({
+            center:[
+              response.map_data.center_long,
+              response.map_data.center_lat
+            ],
+            zoom: response.map_data.center_zoom
+          });
+
+          Draw.add(response.map_data.data)
+          for(var i = 0; i < response.places.length; i++){
+            let data = response.places[i].map_data.data
+            data.id = response.places[i].id
+            Draw.add(data)
+          }
+          for(var z = 0; z < response.polygons.length; z++){
+            let data = response.polygons[z].map_data.data
+            data.id = response.polygons[i].id
+            Draw.add(data)
+          }
+
+          setMapMode('edition')
+
+        }else{
+
+          console.log('No response =_=!')
+          setMapMode('creation')
+
+        }
+          
+        //loadMap()
+        
+      });
+
   }
 
   function renderRoutesSelector(routes){
     var options = [{ value: '0', label: messages.chooseRoute }]
-    for(var i = 0; i < routes.length; i++){
-      options.push({ value: routes[i].id.toString(), label: routes[i].name })
+    for(var i = 0; i < clientRoutes.length; i++){
+      options.push({ value: clientRoutes[i].id.toString(), label: routes[i].name })
     }
     return <Select
       name="route"
-      value={selectedRoute}
+      value={selectedGeoRoute}
       options={options}
       closeMenuOnSelect={true}
-      onChange={e=>{setSelectedRoute(e.value)}}
+      onChange={({ target: { value } }) => {
+        setRoute(value)
+      }}
     />
   }
 
@@ -372,7 +421,7 @@ const HomePage = () => {
             <div>
               <div>
                 {/*<div className="sidebar">Longitude: {lng.toFixed(4)} | Latitude: {lat.toFixed(4)} | Zoom: {Math.round(zoom)}</div>*/}
-                {/*renderRoutesSelector(clientRoutes)*/}
+                {renderRoutesSelector(clientRoutes)}
                 <button color="success" disabled="" onClick={openModal}>Save route</button>
                 <div className="calculation-box">                  
                   <div id="calculated-area"></div>
@@ -383,8 +432,7 @@ const HomePage = () => {
         </div>
         <div className="col-md-12 col-lg-4">
           {getSaveRouteModal()}       
-          {/*<button onClick={viewStored('currentMapData')}>[View storage]</button>   */}
-          
+          {/*<button onClick={viewStored('currentMapData')}>[View storage]</button>*/}          
         </div>
       </div>
     </>

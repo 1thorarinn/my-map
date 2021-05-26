@@ -24,6 +24,7 @@ const mapTile = 'mapbox://styles/mapbox/streets-v11'
 
 // Map vars
 const placesLimit = 6;
+const routesLimit = 10;
 
 const HomePage = () => {
   
@@ -41,7 +42,7 @@ const HomePage = () => {
 
   // Loading all the CMS client routes....
   const [clientRoutes, setClientRoutes] = useState([]);
-  const [mapMode, setMapMode] = useState('creation')
+  const [mapMode, setMapMode] = useState( getStorage('mapMode') ?? 'creation')
 
   const [currentRoute, setCurrentRoute] = useState([]);
   
@@ -99,16 +100,7 @@ const HomePage = () => {
         marker: false
       }));      
 
-      map.current.on('move', () => {
-        setMapLat(map.current.getCenter().lat);
-        setMapLng(map.current.getCenter().lng);        
-        setMapZoom(Math.round(map.current.getZoom()));
-        setStorage('currentMapOptions',{
-          lat: map.current.getCenter().lat,
-          lng: map.current.getCenter().lng,
-          zoom: Math.round(map.current.getZoom())
-        })
-      });
+      map.current.on('move', () => { memoMapData() });
 
       map.current.on('draw.add', createDrawArea);
       map.current.on('draw.create', createDrawArea);
@@ -119,17 +111,53 @@ const HomePage = () => {
       //map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
 
       // Draw temporary stored map!!
-
       if(getStorage('currentMap')){
         Draw.add(getStorage('currentMap'));
       }
 
     });
 
-    const createDrawArea = (e) => { setStoredMap(e.type, Draw.getAll()) }
-    const updateDrawArea = (e) => { setStoredMap(e.type, Draw.getAll()) }    
-    const deleteDrawArea = (e) => { setStoredMap(e.type, Draw.getAll()) }   
+    const createDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }
+    const updateDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }    
+    const deleteDrawArea = (e) => { setStoredMap(e, Draw.getAll()) }   
 
+  }
+  
+  function setStoredMap(e, data){
+
+    console.log('storedMap::'+mapMode)
+
+    if(mapMode === 'creation'){
+
+      setStorage('currentMap', data)
+      setRouteGeoData(data)
+      
+    }else if(mapMode === 'edition'){
+
+      console.log(data)
+
+      switch(e.type){
+
+        case 'move':
+          console.log('She moves!!')
+        break;
+
+        default: break;
+
+      }
+
+      //console.log([e, data])
+
+
+
+
+
+    }
+  }
+
+  function toggleMapMode(mode){
+    setMapMode(mode)
+    setStorage('mapMode', mode)
   }
 
   function resetMap(){
@@ -137,10 +165,6 @@ const HomePage = () => {
     Draw.deleteAll()
   }
 
-  function setStoredMap(e, data){
-    setStorage('currentMap', data)
-    setRouteGeoData(data)
-  }
 
   function launchToast(message, doContinue=false){
     alert(message);
@@ -258,7 +282,7 @@ const HomePage = () => {
     return true;
   }
 
-  function setNewPostRoute(){    
+  function setNewPostRoute(){
     postData(host+'/routes', {
       "name": routeName,
       "creator": userId,
@@ -349,6 +373,8 @@ const HomePage = () => {
 
   function setRoute(value){
 
+    resetMap()
+
     fetch(routesOrigin+'/'+value)
       .then((res) => res.json())
       .catch(error => console.error('Error:', error))
@@ -357,11 +383,40 @@ const HomePage = () => {
         setSelectedGeoRoute(value);
         setStorage('selectedRoute', value)
 
-        resetMap()
+        if(!response){
 
-        if(response){
+          console.log('CREATION MODE!')
+          toggleMapMode('creation')
 
-          setStorage('selectedGeoRoute', response.map_data.data)
+        }else{
+
+          console.log('EDITION MODE!')
+          toggleMapMode('edition')
+
+          let selected = []
+
+          response.map_data.id = response.id
+          Draw.add(response.map_data.data)
+          selected.push(response.map_data.data)
+
+          if(response.places !== undefined){
+            for(var i = 0; i < response.places.length; i++){
+              let data = response.places[i].map_data.data
+              data.id = response.places[i].id
+              Draw.add(data)
+              selected.push(data)
+            }
+          }
+
+          if(response.polygons !== undefined){
+            for(var z = 0; z < response.polygons.length; z++){
+              let data = response.polygons[z].map_data.data
+              data.id = response.polygons[z].id
+              console.log(data)
+              Draw.add(data)
+              selected.push(data)
+            }
+          }
 
           map.current.flyTo({
             center:[
@@ -371,28 +426,9 @@ const HomePage = () => {
             zoom: response.map_data.center_zoom
           });
 
-          Draw.add(response.map_data.data)
-          for(var i = 0; i < response.places.length; i++){
-            let data = response.places[i].map_data.data
-            data.id = response.places[i].id
-            Draw.add(data)
-          }
-          for(var z = 0; z < response.polygons.length; z++){
-            let data = response.polygons[z].map_data.data
-            data.id = response.polygons[i].id
-            Draw.add(data)
-          }
-
-          setMapMode('edition')
-
-        }else{
-
-          console.log('No response =_=!')
-          setMapMode('creation')
+          setStorage('selectedGeoRoute', selected)
 
         }
-          
-        //loadMap()
         
       });
 
@@ -412,6 +448,17 @@ const HomePage = () => {
         setRoute(value)
       }}
     />
+  }
+
+  function memoMapData(){
+    setMapLat(map.current.getCenter().lat);
+    setMapLng(map.current.getCenter().lng);        
+    setMapZoom(Math.round(map.current.getZoom()));
+    setStorage('currentMapOptions',{
+      lat: map.current.getCenter().lat,
+      lng: map.current.getCenter().lng,
+      zoom: Math.round(map.current.getZoom())
+    })
   }
 
   return (

@@ -17,9 +17,18 @@ code {
 }
 
 .mapboxgl-canvas-container {
-  height: 100vh;  
+  height: 99vh;  
 }
 
 .mapboxgl-ctrl {
   clear: none!important;
+}
+
+.nav-bar{
+  margin-top: -30px;
+  position: relative;
+  width: 100%;
+  text-align:center;
+  color:white;
+  background-color: grey;
 }

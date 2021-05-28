@@ -7,7 +7,7 @@ import RouteSelector from './RouteSelector.js'
 import MapboxGL from 'mapbox-gl';
 
 // BuffetJS
-import { Button, InputText } from '@buffetjs/core';
+import { Button, InputText, Textarea, Label } from '@buffetjs/core';
 import { LoadingBar  } from '@buffetjs/styles';
 
 // Fontawsome...
@@ -42,7 +42,7 @@ const defaultCenter = {
 
 const HomePage = () => {
   
-  const [userId, setUserId] = useState(12)
+  const [userId, setUserId] = useState(4)
 
   // Map Settings
   const map = useRef(null);
@@ -73,7 +73,7 @@ const HomePage = () => {
   const [currentRouteName, setCurrentRouteName] = useState(getStorage('currentRouteName', 'string') ?? '')
   const [routeDescription, setRouteDescription] = useState(getStorage('routeDescription', 'string') ?? 'Set here the english description')//XXX: MUST be english, the main lang at least for auto ;)  
   
-  const [saveButtonStatus, setSaveButtonStatus] = useState(getStorage('disabledMainSaveButton', 'string') === 'false' ? false : true)
+  const [saveButtonStatus, setSaveButtonStatus] = useState(getStorage('disabledMainSaveButton', 'string') ??  true)
   const [saveButtonStyle, setSaveButtonStyle] = useState(getStorage('setSaveButtonStyle', 'string') ?? 'primary')
 
   // Publish button parameters
@@ -387,17 +387,24 @@ const HomePage = () => {
     console.log([currentRouteName, currentRoute.features.length])
     if(currentRouteName !== '' && currentRoute.features.length > 2 ){      
       console.log('Enable de button!!')
-      mainSaveButtonStatus(false)
+      //mainSaveButtonStatus(true)
     }else{
       console.log('Disable the button!!')
-      mainSaveButtonStatus(true)
+      //mainSaveButtonStatus(false)
     }
+    //mainSaveButtonStatus(false)
   }
 
   function storeRouteName(name){
     setCurrentRouteName(name)
     setStorage('currentRouteName', name, 'string')
     defineSaveButtonStatus()
+  }
+
+  function storeRouteDescription(name){
+    setCurrentRouteName(name)
+    setStorage('currentRouteDescription', name, 'string')
+    //defineSaveButtonStatus()
   }
 
   function viewRouteData(){
@@ -639,7 +646,7 @@ const HomePage = () => {
               <Button
                 label="Save"
                 color={saveButtonStyle}
-                disabled={saveButtonStatus}
+                disabled={!saveButtonStatus}
                 onClick={validateSaving}
               />
             </div>
@@ -651,15 +658,23 @@ const HomePage = () => {
           </div>
           <br/>
           <div className='row'>
-            <label>Route name</label>
-          </div>
-          <div className='row'>
+            <Label htmlFor="route-name">Route name</Label>
             <InputText
               type='text'
               name='route-name'
               value={currentRouteName} 
               placeholder='Set the route name...'
+              required='true'
               onChange={({ target: { value } }) =>{storeRouteName(value)}}
+            />
+          </div>
+          <br/>
+          <div className='row'>
+            <Label htmlFor="route-description">Route description</Label>
+            <Textarea
+              name="route-description"
+              onChange={({ target: { value } }) =>{storeRouteDescription(value)}}
+              value={routeDescription}
             />
           </div>
           {/*getSaveRouteModal()*/}                 

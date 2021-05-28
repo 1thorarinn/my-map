@@ -15,6 +15,11 @@ const RouteSelector = () => {
         .then((res) => res.json())
         .then(setClientRoutes); 
     },[userId]);
+    
+    function handleChange(e){
+        console.log(e)
+        this.props.selectedRoute = e.target.value
+    }
 
     var options = [{ value: '0', color: 'grey', label: messages.chooseRoute }]
     for(var i = 0; i < clientRoutes.length; i++){
@@ -22,9 +27,10 @@ const RouteSelector = () => {
     }
     return <Select
       name="route"
+      value={currentRouteId}
       options={options}
       closeMenuOnSelect={true}
-      
+      onChange={ (e) => handleChange(e) }
     />
 
 }

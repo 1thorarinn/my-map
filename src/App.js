@@ -653,8 +653,8 @@ const HomePage = () => {
           </div> 
           <br/>
           <div className='row'>
-            {renderRoutesSelector(clientRoutes)}
-           {/*} <RouteSelector onChange={()=>console.log('maybe')}/>*/}
+            {/*renderRoutesSelector(clientRoutes)*/}
+           <RouteSelector selectedRoute={(value)=>{setCurrentRouteId(value)}}/>
           </div>
           <br/>
           <div className='row'>

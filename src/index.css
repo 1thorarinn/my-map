@@ -32,3 +32,8 @@ code {
   color:white;
   background-color: grey;
 }
+
+/*TODO: Try to show again but repairing first the "broken design" for this icons*/
+.mapboxgl-ctrl-geocoder--icon-search, .mapboxgl-ctrl-geocoder--pin-right {
+  display: none;
+}

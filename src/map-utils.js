@@ -61,6 +61,17 @@ export function checkFeaturesAmount(data=[], type='Point'){
     return amount
 }
 
+export function makeId(length) {
+    var result           = [];
+    var characters       = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+      result.push(characters.charAt(Math.floor(Math.random() * 
+ charactersLength)));
+   }
+   return result.join('');
+}
+
 export async function postData(url = '', data = {}) {
     // Opciones por defecto estan marcadas con un *
     const response = await fetch(url, {

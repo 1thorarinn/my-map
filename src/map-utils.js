@@ -6,10 +6,17 @@ export function setStorage(key, data, type='json'){
         : localStorage.setItem(key, data)
 }
 
-export function getStorage(key, type='json'){
-    return (type === 'json')
-        ? JSON.parse(localStorage.getItem(key))
-        : localStorage.getItem(key);
+export function getStorage(key, type='json', def=''){
+    var res = ''
+    if(def !== ''){
+        res = def
+        setStorage(key, def, type)
+    }else{
+        res = (type === 'json')
+            ? JSON.parse(localStorage.getItem(key))
+            : localStorage.getItem(key);
+    }
+    return res
 }
 
 export function removeStorage(key, type='json'){
@@ -47,7 +54,7 @@ export const customStyles = {
 }
 
 export const messages = {
-    chooseRoute : 'Create a route...'
+    chooseRoute : 'Select a route...'
 }
 
 // Checking stored LiveMap

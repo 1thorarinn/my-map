@@ -37,3 +37,7 @@ code {
 .mapboxgl-ctrl-geocoder--icon-search, .mapboxgl-ctrl-geocoder--pin-right {
   display: none;
 }
+
+.my-input {
+  z-index: 0;
+}

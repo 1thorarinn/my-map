@@ -19,7 +19,7 @@ export function getStorage(key, type='json', def=''){
     return res
 }
 
-export function removeStorage(key, type='json'){
+export function removeStorage(key){
     return localStorage.removeItem(key);
 }
 
@@ -33,6 +33,7 @@ export function getRouteType(data=[], type='Point'){
 
 export const Draw = new MapboxGLDraw({
     displayControlsDefault: true,
+    drawing: true,
     controls: {
         polygon: true,
         polyline: true,

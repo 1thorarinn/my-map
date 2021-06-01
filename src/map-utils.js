@@ -1,9 +1,10 @@
 import MapboxGLDraw from "@mapbox/mapbox-gl-draw";
 
 export function setStorage(key, data, type='json'){
-    return ( type === 'json')
+    var ret = ( type === 'json')
         ? localStorage.setItem(key, JSON.stringify(data))
         : localStorage.setItem(key, data)
+    return ret
 }
 
 export function getStorage(key, type='json', def=''){
@@ -42,17 +43,50 @@ export const Draw = new MapboxGLDraw({
     }
 });
   
-export const customStyles = {
-    content : {
-        //width                 : '45%',
-        top                   : '50%',
-        left                  : '50%',
-        right                 : 'auto',
-        bottom                : 'auto',
-        marginRight           : '-50%',
-        transform             : 'translate(-50%, -50%)'
+export const placesModalStyle = {
+    overlay: {
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(125, 125, 125, 0.75)',
+        overflow: 'hidden',
+        zIndex: 3,
+    },
+    content: {
+        position: 'absolute',
+        top: '70px', left: '25%', right: '25%', bottom: '70px',
+        border: '1px solid #ccc',
+        background: '#fff',
+        overflow: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        borderRadius: '4px',
+        outline: 'none',
+        padding: '40px',
+        zIndex: 4,
     }
 }
+
+export const alertModalStyle = {
+    overlay: {
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(125, 125, 125, 0.75)',
+        overflow: 'hidden',
+        zIndex: 3,
+    },
+    content: {
+        position: 'absolute',
+        top: '30%', left: '30%', right: '30%', bottom: '30%',
+        border: '1px solid #ccc',
+        background: '#fff',
+        overflow: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        borderRadius: '4px',
+        outline: 'none',
+        padding: '40px',
+        textAlign: 'center',
+        zIndex: 4,
+    }
+  }
 
 export const messages = {
     chooseRoute : 'Select a route...'

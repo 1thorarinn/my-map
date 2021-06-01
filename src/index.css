@@ -33,6 +33,10 @@ code {
   background-color: grey;
 }
 
+.modal-header{
+  text-align: center;
+}
+
 /*TODO: Try to show again but repairing first the "broken design" for this icons*/
 .mapboxgl-ctrl-geocoder--icon-search, .mapboxgl-ctrl-geocoder--pin-right {
   display: none;
@@ -40,4 +44,8 @@ code {
 
 .my-input {
   z-index: 0;
+}
+
+.description {
+  font-size: 1rem!important;
 }

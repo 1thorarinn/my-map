@@ -1,31 +1,31 @@
-import React, { memo, useRef, useEffect, useState } from 'react';
-import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core';
-//import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
-import 'react-tabs/style/react-tabs.css';
-import Modal from 'react-modal';
-import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder';
+import React, { memo, useRef, useEffect, useState } from 'react'
+import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core'
+import 'react-tabs/style/react-tabs.css'
+import Modal from 'react-modal'
+import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
+import { Header } from '@buffetjs/custom';
 //import RouteSelector from './RouteSelector.js'
 
-import MapboxGL from 'mapbox-gl';
+import MapboxGL from 'mapbox-gl'
 
 // BuffetJS
-//import { LoadingBar  } from '@buffetjs/styles';
+import { LoadingBar  } from '@buffetjs/styles';
 
 // Fontawsome...
 //import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 
-import { setStorage, getStorage, getRouteType, getData, Draw, customStyles, putData, deleteData, messages, removeStorage, checkFeaturesAmount, postData, makeId } from './map-utils.js';
+import { setStorage, getStorage, getRouteType, alertModalStyle, getData, Draw, placesModalStyle, putData, deleteData, messages, removeStorage, checkFeaturesAmount, postData, makeId } from './map-utils.js';
 
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
-import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/css/bootstrap.min.css'
 import './index.css'
 
 const host ='http://161.97.167.92:1337';
 MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg"
-const MapboxLanguage = require('@mapbox/mapbox-gl-language');
+const MapboxLanguage = require('@mapbox/mapbox-gl-language')
 
 const routesOrigin = host+'/routes'
 const polygonsOrigin = host+'/polygons'
@@ -34,8 +34,8 @@ const placesOrigin = host+'/my-places'
 const mapTile = 'mapbox://styles/mapbox/streets-v11'
 
 // Map vars
-const placesLimit = 6;
-const userId = 12;
+const placesLimit = 6
+const userId = 12
 var newId = makeId(6)
 //const routesLimit = 10;
 //const publishEnabled = false
@@ -64,6 +64,7 @@ const HomePage = () => {
   //  Map
   const [mapOpts, setRouteOptions] = useState(getStorage('routeOptions') ?? defaultCenter)
   const [routeMode, setRouteMode] = useState(getStorage('routeMode', 'string'))
+  const [isLoading, setIsLoading] = useState(false)
 
   // Map coords
   const [focusLat,  setMapLat]  = useState(mapOpts.lat)
@@ -122,26 +123,21 @@ const HomePage = () => {
       lat:  map.current.getCenter().lat,
       lng:  map.current.getCenter().lng,
       zoom: Math.round(map.current.getZoom())
+    })    
+    /*putData(routesOrigin+'/'+routeId, {
+      'map_data' : {
+        "center_lat": getStorage('routeOptions').lat ?? defaultCenter.lat,
+        "center_long": getStorage('routeOptions').lng ?? defaultCenter.lng,
+        "center_zoom": getStorage('routeOptions').zoom ?? defaultCenter.zoom,
+      }
     })
-    
-    let decideToChange = routeId !== null && parseInt(getStorage('lastMapOptionsUpdate')) > Date.now()+60    
-    if(decideToChange){
-      putData(routesOrigin+'/'+routeId, {
-        "map_data" : {
-          "center_lat": getStorage('routeOptions').lat,
-          "center_long": getStorage('routeOptions').lng,
-          "center_zoom": getStorage('routeOptions').zoom,
-        }
-      })
-      .then(response =>{
-        if(response.statusCode === 400){
-          console.log('Something was wrong in setMapOptions post call')
-        }else{
-          console.log('The route center params were updated...')
-          setStorage('lastMapOptionsUpdate', Date.now())
-        }
-      })
-    }
+    .then(response =>{
+      if(response.statusCode === 400){
+        console.log('Something was wrong in setMapOptions post call')
+      }else{
+        console.log('The route center params were updated...')
+      }
+    })*/
   }
 
   function renderRoutesSelector(){
@@ -150,7 +146,7 @@ const HomePage = () => {
       options.push({ value: clientRoutes[i].id.toString(), label: clientRoutes[i].name ?? '' })
     }
     return (options.length > 1 )
-      ? <>          
+      ? <>
           <Label htmlFor="selected-route">Create new or edit existent...</Label>
           <Select
             name="selected-route"
@@ -194,12 +190,12 @@ const HomePage = () => {
         marker: false
       }))
 
-      map.current.on('move', () => { setMapOptions() })
+      map.current.on('move', (e) => { setMapOptions() })
 
-      map.current.on('draw.add',    updateDrawArea)
-      map.current.on('draw.create', updateDrawArea)
-      map.current.on('draw.update', updateDrawArea)
-      map.current.on('draw.delete', updateDrawArea)
+      map.current.on('draw.add',    (e)=>{ updateRoute(e, Draw.getAll()) })
+      map.current.on('draw.create', (e)=>{ updateRoute(e, Draw.getAll()) })
+      map.current.on('draw.update', (e)=>{ updateRoute(e, Draw.getAll()) })
+      map.current.on('draw.delete', (e)=>{ updateRoute(e, Draw.getAll()) })
 
       map.current.addControl(new MapboxLanguage());
       //map.current.addControl(new MapboxGL.FullscreenControl());
@@ -212,8 +208,6 @@ const HomePage = () => {
 
     })
 
-    const updateDrawArea = (e) => { updateRoute(e, Draw.getAll()) }
-
   }
 
   function resetRouteDraw(){
@@ -224,6 +218,7 @@ const HomePage = () => {
   }
 
   function loadRoute(selectedRouteId){
+    setIsLoading(true)
     if(selectedRouteId === 0){
       resetToCreationMode()
     }else{
@@ -251,6 +246,7 @@ const HomePage = () => {
     resetPublishButton()
     resetRouteDraw()
     flyTo(defaultCenter.lat, defaultCenter.lng, defaultCenter.zoom+5)
+    setTimeout(function(){setIsLoading(false)},2000)
   }
 
   function resetToEditonMode(response){
@@ -262,8 +258,8 @@ const HomePage = () => {
     storeRouteDescription(response.description[0].description)
     storeRouteIsPublished(response.published)
     drawSelectedRoute(response)
-    //console.log(response.map_data)
     flyTo(response.map_data.center_lat, response.map_data.center_long, response.map_data.center_zoom)
+    setTimeout(function(){setIsLoading(false)},2000)
   }
 
   function drawSelectedRoute(response){
@@ -358,12 +354,7 @@ const HomePage = () => {
               "label": label,
               "description": description
             }],
-            "map_data" : {
-              "center_lat": getStorage('routeOptions').lat,
-              "center_long": getStorage('routeOptions').lng,
-              "center_zoom": getStorage('routeOptions').zoom,
-              "data" : ( isLineString ) ? mapElement.features[0] : '',
-            }
+            'map_data': setMapData(mapElement, mapElement.features[0])
           })
           .then(res => {
 
@@ -435,12 +426,7 @@ const HomePage = () => {
         "creator": userId,
         "parent_route": route,
         "element": mapElement.features[0].id,
-        "map_data": {
-          "center_lat": getStorage('routeOptions').lat,
-          "center_long": getStorage('routeOptions').lng,
-          "center_zoom": getStorage('routeOptions').zoom,
-          "data": mapElement.features[0],
-        }
+        'map_data': setMapData(mapElement)
       })
       .then(data => {
         if(data.statusCode === 400){
@@ -456,10 +442,28 @@ const HomePage = () => {
     }
   }
 
+  function setMapData(features){
+    let routeOptions = getStorage('routeOptions')
+    var lat = defaultCenter.lat
+    var lng = defaultCenter.lng
+    var zoom = defaultCenter.zoom
+    if(routeOptions){
+      lat = getStorage('routeOptions').lat
+      lng = getStorage('routeOptions').lng
+      zoom = getStorage('routeOptions').zoom
+    }
+    return {
+      "center_lat": lat,
+      "center_long": lng,
+      "center_zoom": zoom,
+      "data": features,
+    }
+  }
+
   function deleteMapElement(mapElement){
 
     if(routeIsPublished){
-      alert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
+      setAlert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
       return false
     }
 
@@ -522,14 +526,7 @@ const HomePage = () => {
         console.log('You got the desired element '+mapElement.features[0].id)
         var  putUrl = url+'/'+response[0].id
 
-        putData(putUrl, {
-          "map_data" : {
-            "center_lat": getStorage('routeOptions').lat,
-            "center_long": getStorage('routeOptions').lng,
-            "center_zoom": getStorage('routeOptions').zoom,
-            "data" : mapElement.features[0]
-          }
-        })
+        putData(putUrl, { 'map_data' : setMapData(mapElement.features[0]) })
         .then(data => {
           if(data.statusCode === 400){
             console.log('Something was wrong with updateRouteElement action...')
@@ -542,7 +539,7 @@ const HomePage = () => {
     })
   }
 
-  function postPlace(key, placeFeatures, i){    
+  function postPlace(placeFeatures){    
     postData(placesOrigin, {
       "name": placeName,
       "creator": userId,
@@ -553,18 +550,14 @@ const HomePage = () => {
         "label": placeLabel,
         "description": placeDescription
       }],
-      "map_data": {
-        "center_lat": getStorage('routeOptions').lat,
-        "center_long": getStorage('routeOptions').lng,
-        "center_zoom": getStorage('routeOptions').zoom,
-        "data": placeFeatures
-      }
+      'map_data': setMapData(placeFeatures)
     })
     .then(data => {
       if(data.statusCode === 400){
         console.log('Something was wrong with this action...')
       }else{
-        console.log('Place '+key+' posted successful ;)')
+        console.log('Place '+placeFeatures.id+' posted successful ;)')
+        setPlaceModalStatus(false)
       }
     })
   }
@@ -575,12 +568,7 @@ const HomePage = () => {
       "creator": userId,
       "parent_route" : routeId,      
       "element": polygonFeatures.id,
-      "map_data": {
-        "center_lat": getStorage('routeOptions').lat,
-        "center_long": getStorage('routeOptions').lng,
-        "center_zoom": getStorage('routeOptions').zoom,
-        "data": polygonFeatures
-      },
+      'map_data': setMapData(polygonFeatures)
     })
     .then(data => {
       if(data.statusCode === 400){
@@ -657,7 +645,6 @@ const HomePage = () => {
         return false
       }
     }else{
-      console.log('Publishing??')
       if(validatePublishing()){
         if(window.confirm('ALERT:\n\nIf you continue the route will appear from the app after next data uprgade\n\nDo you wanna publish the route?')){         
           storeRouteIsPublished(true)
@@ -705,7 +692,7 @@ const HomePage = () => {
         let storedPointsAmount = checkFeaturesAmount(Route, 'Point');
         if(storedPointsAmount < 1 ){
           if (!window.confirm("You don't have addressed any Place to your route. \nWe encourage you to put, at least, one Place Marker ;)\n\n Do you really want to save?\n\n")) {
-            //if(!launchToast('You canceled to save this Route')) 
+            setAlert('You canceled to save this Route')
             return false
           }
         }else if(storedPointsAmount > placesLimit ){
@@ -832,88 +819,94 @@ const HomePage = () => {
     setPlaceModalStatus(false)
   }
 
-  function savePlace(){    
+  function savePlace(event){
+    event.preventDefault()
     var mapElement = getStorage('tmpPoint', 'json')
     if(mapElement !== ''){//Undo
-      postPlace(mapElement.id, mapElement, makeId(6))
-      setStorage('tmpPoint', '', 'json')
-      setPlaceName('')
-      setPlaceLabel('')
-      setPlaceDescription('')
-
+      if(placeName === '' && placeLabel === '' && placeDescription === ''){
+        return false
+      }else{
+        postPlace(mapElement) 
+      }
     }else{
-      alert('Theres is not data to save about the place');
-      Draw.trash()      
-    }
-    setPlaceModalStatus(false)
+      setAlert('Theres is not data to save about the place');
+      Draw.trash()  
+      setPlaceModalStatus(false)    
+    }    
   }
 
   function getEditPlaceModal(){
-    return <Modal
-      isOpen={placeModalStatus}
-      style={customStyles}
-      contentLabel="Save your place"
-    >
-    <div className='table'>
-      <div className='row'>
-        <h2>Set the place data</h2>
-      </div>
-      <div className='row'>
-        <div className='col-12'>
-          <Label htmlFor="place-name">Place name</Label>
-          <InputText
-            type='text'
-            name='place-name'
-            value={placeName} 
-            placeholder='Set here the place name for this route...'
-            required={true}
-            onChange={({ target: { value } }) =>{storePlaceName(value)}}
-          />
+    return (
+      <Modal
+        isOpen={placeModalStatus}
+        style={placesModalStyle}
+        contentLabel="Save your place"
+      >
+        <div className='table'>
+          <div className='row' style={{textAlign: 'center', bottom:'10px'}}>
+            <Label htmlFor="place-name"><h2>Set the place data</h2></Label>
+          </div>
+          <div className='row'>
+            <div className='col-12'>
+              <Label htmlFor="place-name">Name</Label>
+              <InputText
+                type='text'
+                name='place-name'
+                value={placeName} 
+                placeholder='Set here the place name for this route...'
+                required={true}
+                onChange={({ target: { value } }) =>{storePlaceName(value)}}
+              />
+              <span style={{color: placeName ? 'white' : 'red'}}>Please, set a place name...</span>
+            </div>
+          </div>
+          <div className='row'>
+            <div className='col-12'>
+              <Label htmlFor="place-label">Label</Label>
+              <InputText
+                type='text'
+                name='place-label'
+                value={placeLabel} 
+                placeholder='Set here the place label for this route...'
+                required={true}
+                onChange={({ target: { value } }) =>{storePlaceLabel(value)}}
+              />
+              <span style={{color: placeLabel ? 'white' : 'red'}}>Please, set a place label...</span>
+            </div>
+          </div>
+          <div className='row'>
+            <div className='col-12'>
+              <Label htmlFor="place-description">Description</Label>
+              <Textarea
+                name="route-description"
+                className={'description'}
+                placeholder='Set here the description for this place...'
+                required={true}
+                onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
+                value={placeDescription}
+              />
+              <span style={{color: placeDescription ? 'white' : 'red'}}>Please, set a place label...</span>          
+            </div>
+          </div>
+          <div className='row'>
+            <div className='col-6' style={{textAlign: 'center', marginTop: '20px'}}>
+              <Button
+                label={'Save'}
+                type="submit"            
+                onClick={savePlace}
+              />
+            </div>
+            <div className='col-6' style={{textAlign: 'center', marginTop: '20px'}}>
+              <Button
+                label={'Cancel'}            
+                color={publishButtonColor}
+                onClick={cancelPlace}
+              />
+            </div>
+          </div>
         </div>
-      </div>
-      <div className='row'>
-        <div className='col-12'>
-          <Label htmlFor="place-label">Place label</Label>
-          <InputText
-            type='text'
-            name='place-label'
-            value={placeLabel} 
-            placeholder='Set here the place label for this route...'
-            required={true}
-            onChange={({ target: { value } }) =>{storePlaceLabel(value)}}
-          />
-        </div>
-      </div>
-      <div className='row'>
-        <div className='col-12'>
-          <Label htmlFor="place-description">Place label</Label>
-          <Textarea
-            name="route-description"
-            placeholder='Set here the description for this place...'
-            required={true}
-            onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
-            value={placeDescription}
-          /> 
-        </div>
-      </div>
-      <br/>
-      <div className='row'>
-        <div className='col-6'>
-          <Button
-            label={'Save'}            
-            onClick={savePlace}
-          />
-        </div>
-        <div className='col-6'>
-          <Button
-            label={'Cancel'}            
-            color={publishButtonColor}
-            onClick={cancelPlace}
-          />
-        </div>
-      </div>
-    </div>
-  </Modal>
+      </Modal>
+    )
   }
 
   function setAlert(message){
@@ -926,42 +919,19 @@ const HomePage = () => {
   }
 
   function alertModal(){
-    return <Modal
-      isOpen={alertModalStatus}
-      contentLabel={alertModalMessage}
-      width='30%'
-      style={{
-        overlay: {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.75)'
-        },
-        content: {
-          position: 'absolute',
-          top: '40px',
-          left: '40px',
-          right: '40px',
-          bottom: '40px',
-          border: '1px solid #ccc',
-          background: '#fff',
-          overflow: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          borderRadius: '4px',
-          outline: 'none',
-          padding: '20px',
-          textAlign: 'center',
-        }
-      }}
-    ><Label htmlFor="input" message={alertModalMessage} />
-      <Button
-        label={'OK'}            
-        color={publishButtonColor}
-        onClick={closeAlert}
-      />
-    </Modal>
+    return (
+      <Modal
+        isOpen={alertModalStatus}
+        contentLabel={alertModalMessage}
+        style={alertModalStyle}
+      ><Label htmlFor="input" message={alertModalMessage} />
+        <Button
+          label={'OK'}            
+          color={publishButtonColor}
+          onClick={closeAlert}
+        />
+      </Modal>
+    )
   }
 
   return (
@@ -996,10 +966,11 @@ const HomePage = () => {
           <br/>  
           <div className='row'>
             {renderRoutesSelector()}
+            <LoadingBar style={{width:'100%', display: isLoading ? 'block' : 'none'}}/>
           </div>
           <br/>  
           <div className='row'>
-            <Label htmlFor="route-name">Route name</Label>
+            <Label htmlFor="route-name">Name</Label>
             <InputText
               type='text'
               name='route-name'
@@ -1009,30 +980,32 @@ const HomePage = () => {
               required={true}
               onChange={({ target: { value } }) =>{storeRouteName(value)}}
             />
+            <span style={{color: routeName ? 'white' : 'red'}}>Please, set a route name...</span>
           </div>
-          <br/>
           <div className='row'>
-            <Label htmlFor="route-label">Route label</Label>
+            <Label htmlFor="route-label">Label</Label>
             <InputText
               type='text'
               name='route-label'
               className='my-input'
               value={routeLabel}
-              placeholder='Set here the route label...'
+              placeholder='Set a header label...'
               required={true}
               onChange={({ target: { value } }) =>{storeRouteLabel(value)}}
             />
+            <span style={{color: routeLabel ? 'white' : 'red'}}>Please, set a route label...</span>
           </div>
-          <br/>
           <div className='row'>
-            <Label htmlFor="route-description">Route description</Label>
+            <Label htmlFor="route-description">Description</Label>
             <Textarea
               name="route-description"
-              placeholder='Set here the description...'
+              className={'description'}
+              placeholder='Set a description...'
               required={true}
               onChange={({ target: { value } }) =>{storeRouteDescription(value)}}
               value={routeDescription}
-            /> 
+            />
+            <span style={{color: routeDescription ? 'white' : 'red'}}>Please, set a route description...</span>
           </div>
         </div>
       </div>

@@ -109,7 +109,7 @@ const HomePage = () => {
     fetch(routesOrigin+'?created_by='+userId)
     .then((res) => res.json())
     .then(setClientRoutes); 
-  },[routeId]);
+  },[routeId, routeName]);
 
   useEffect(() => {
     loadMap()
@@ -847,46 +847,48 @@ const HomePage = () => {
             <Label htmlFor="place-name"><h2>Set the place data</h2></Label>
           </div>
           <div className='row'>
-            <div className='col-12'>
-              <Label htmlFor="place-name">Name</Label>
-              <InputText
-                type='text'
-                name='place-name'
-                value={placeName} 
-                placeholder='Set here the place name for this route...'
-                required={true}
-                onChange={({ target: { value } }) =>{storePlaceName(value)}}
-              />
-              <span style={{color: placeName ? 'white' : 'red'}}>Please, set a place name...</span>
-            </div>
+            <Label htmlFor="place-name">Name</Label>
+            <InputText
+              type='text'
+              name='place-name'
+              className='my-input'
+              value={placeName} 
+              placeholder='Set here the place name for this route...'
+              required={true}
+              onChange={({ target: { value } }) =>{storePlaceName(value)}}
+            />
           </div>
           <div className='row'>
-            <div className='col-12'>
-              <Label htmlFor="place-label">Label</Label>
-              <InputText
-                type='text'
-                name='place-label'
-                value={placeLabel} 
-                placeholder='Set here the place label for this route...'
-                required={true}
-                onChange={({ target: { value } }) =>{storePlaceLabel(value)}}
-              />
-              <span style={{color: placeLabel ? 'white' : 'red'}}>Please, set a place label...</span>
-            </div>
+            <span style={{color: placeName ? 'white' : 'red'}}>Please, set a place name...</span>
+          </div>
+          <div className='row my-input'>
+            <Label htmlFor="place-label">Label</Label>
+            <InputText
+              type='text'
+              name='place-label'
+              className='my-input'
+              value={placeLabel} 
+              placeholder='Set here the place label for this route...'
+              required={true}
+              onChange={({ target: { value } }) =>{storePlaceLabel(value)}}
+            />
           </div>
           <div className='row'>
-            <div className='col-12'>
-              <Label htmlFor="place-description">Description</Label>
-              <Textarea
-                name="route-description"
-                className={'description'}
-                placeholder='Set here the description for this place...'
-                required={true}
-                onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
-                value={placeDescription}
-              />
-              <span style={{color: placeDescription ? 'white' : 'red'}}>Please, set a place label...</span>          
-            </div>
+            <span style={{color: placeLabel ? 'white' : 'red'}}>Please, set a place label...</span>
+          </div>
+          <div className='row'>
+            <Label htmlFor="place-description">Description</Label>
+            <Textarea
+              name="route-description"
+              className={'description'}
+              placeholder='Set here the description for this place...'
+              required={true}
+              onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
+              value={placeDescription}
+            />
+          </div>
+          <div className='row'>
+            <span style={{color: placeDescription ? 'white' : 'red'}}>Please, set a place label...</span> 
           </div>
           <div className='row'>
             <div className='col-6' style={{textAlign: 'center', marginTop: '20px'}}>
@@ -942,8 +944,8 @@ const HomePage = () => {
           <div className="nav-bar">Longitude: {focusLng.toFixed(4)} • Latitude: {focusLat.toFixed(4)} • Zoom: {Math.round(focusZoom)}</div>
         </div>
         <div className="col-md-4 col-lg-4">
-        <br/>
-        <div className='row'>
+          <br/>
+          <div className='row'>
             <div className='col-6'>
               <Button
                 label={'Delete'}            
@@ -980,6 +982,8 @@ const HomePage = () => {
               required={true}
               onChange={({ target: { value } }) =>{storeRouteName(value)}}
             />
+          </div>
+          <div className='row'>
             <span style={{color: routeName ? 'white' : 'red'}}>Please, set a route name...</span>
           </div>
           <div className='row'>
@@ -991,19 +995,23 @@ const HomePage = () => {
               value={routeLabel}
               placeholder='Set a header label...'
               required={true}
+              style={{width:'90%'}}
               onChange={({ target: { value } }) =>{storeRouteLabel(value)}}
             />
+          </div>
+          <div className='row'>
             <span style={{color: routeLabel ? 'white' : 'red'}}>Please, set a route label...</span>
           </div>
           <div className='row'>
             <Label htmlFor="route-description">Description</Label>
             <Textarea
               name="route-description"
+              value={routeDescription}
+              style={{width:'90%'}}
               className={'description'}
               placeholder='Set a description...'
               required={true}
               onChange={({ target: { value } }) =>{storeRouteDescription(value)}}
-              value={routeDescription}
             />
             <span style={{color: routeDescription ? 'white' : 'red'}}>Please, set a route description...</span>
           </div>

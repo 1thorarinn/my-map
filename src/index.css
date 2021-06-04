@@ -17,35 +17,58 @@ code {
 }
 
 .mapboxgl-canvas-container {
-  height: 99vh;  
+  height: 98.3vh;  
+}
+
+.nav-bar{
+  position: relative;
+  text-align: center;
+  margin-top: -33px;
+  width: 100%;
+  color: white;
+  background-color: grey;
+  opacity: 0.8;
+  height: 33px;
+  padding-top: 4px;
 }
 
 .mapboxgl-ctrl {
   clear: none!important;
 }
 
-.nav-bar{
-  margin-top: -30px;
-  position: relative;
-  width: 100%;
-  text-align:center;
-  color:white;
-  background-color: grey;
+.mapboxgl-ctrl-geocoder--icon-search, .mapboxgl-ctrl-geocoder--pin-right {
+  display: none;
 }
 
 .modal-header{
   text-align: center;
 }
 
-/*TODO: Try to show again but repairing first the "broken design" for this icons*/
-.mapboxgl-ctrl-geocoder--icon-search, .mapboxgl-ctrl-geocoder--pin-right {
-  display: none;
-}
-
 .my-input {
-  z-index: 0;
+  z-index: 100%;
 }
 
 .description {
   font-size: 1rem!important;
+  width: 95%!important;
+}
+
+.selected_route {
+  width: 30%!important;
+}
+
+.head-advisory {
+  text-align: center;
+  width: 100%;
+  font-size: 2rem!important;
+}
+
+.advisory {
+  text-align: left;
+}
+
+.my-button {
+  width: 80%;
+  margin-top: 10px;
+  border-radius: 4px;
 }

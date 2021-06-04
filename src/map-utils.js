@@ -75,7 +75,7 @@ export const alertModalStyle = {
     },
     content: {
         position: 'absolute',
-        top: '30%', left: '30%', right: '30%', bottom: '30%',
+        top: '35%', left: '30%', right: '30%', bottom: '30%',
         border: '1px solid #ccc',
         background: '#fff',
         overflow: 'hidden',

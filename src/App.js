@@ -1,4 +1,6 @@
 import React, { memo, useRef, useEffect, useState } from 'react'
+
+
 import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core'
 import 'react-tabs/style/react-tabs.css'
 import Modal from 'react-modal'
@@ -37,14 +39,15 @@ const mapTile = 'mapbox://styles/mapbox/streets-v11'
 const placesLimit = 12
 
 // User params
-const username = 'David';//get(auth.getUserInfo(), 'firstname', '')
-const user_id = 12;// get(auth.getUserInfo(), 'id', '')
+const username = 'Hello';//get(auth.getUserInfo(), 'firstname', '')
+const user_id = 12;//get(auth.getUserInfo(), 'id', '')
+setStorage('STRAPI_UPDATE_NOTIF', true, 'string')
 
 //const routesLimit = 10;
 //const publishEnabled = false
-const [newId,] = makeId(6)
+
 const createText = 'Publish'
-const defaultCenter = { lat: 39.79, lng: 2.68, zoom: 3 }
+const defaultCenter = { lat: 50.79, lng: 16.68, zoom: 3 }
 const defSelected = { type: 'FeatureCollection', features: [] }
 const mapStyle = {
   position:'absolute',
@@ -56,11 +59,10 @@ const mapStyle = {
 
 const HomePage = () => {
   
-  //const [user_id, setUserId] = useState(4)
-
   // Map Settings
   const map = useRef(null);
   const mapContainer = useRef(null);
+  const [newId, setNewId] = useState(makeId(6)) 
 
   // Client routes for the select button
   const [clientRoutes, setClientRoutes] = useState([]);
@@ -96,6 +98,7 @@ const HomePage = () => {
   const [placeModalStatus, setPlaceModalStatus] = useState(false);
   const [alertModalStatus, setAlertModalStatus] = useState(false);
   const [alertModalMessage, setAlertModalMessage] = useState('');
+  const [alertModalLabel, setAlertModalLabel] = useState('');
 
   const [placeName, setPlaceName] = useState('')
   const [placeLabel, setPlaceLabel] = useState('')
@@ -105,9 +108,7 @@ const HomePage = () => {
   const [routeChangesAdvisory, setRouteChangesAdvisory] = useState(getStorage('routeChangesAdvisory', 'string') ?? false)
   const [routeCreationAdvisory, setRouteCreationAdvisory] = useState(getStorage('routeCreationAdvisory', 'string') ?? false)
 
-  if (typeof(window) !== 'undefined') {
-    Modal.setAppElement('body')
-  }
+  if (typeof(window) !== 'undefined') { Modal.setAppElement('body') }
 
   useEffect(() => { 
     fetch(routesOrigin+'?created_by='+user_id)
@@ -127,21 +128,24 @@ const HomePage = () => {
       lat:  map.current.getCenter().lat,
       lng:  map.current.getCenter().lng,
       zoom: Math.round(map.current.getZoom())
-    })    
-    /*putData(routesOrigin+'/'+routeId, {
-      'map_data' : {
-        "center_lat": getStorage('routeOptions').lat ?? defaultCenter.lat,
-        "center_long": getStorage('routeOptions').lng ?? defaultCenter.lng,
-        "center_zoom": getStorage('routeOptions').zoom ?? defaultCenter.zoom,
-      }
     })
-    .then(response =>{
-      if(response.statusCode === 400){
-        console.log('Something was wrong in setMapOptions post call')
-      }else{
-        console.log('The route center params were updated...')
-      }
-    })*/
+    if(routeId !== 0 && routeId !== null){
+      putData(routesOrigin+'/'+routeId, {
+        'map_data' : {
+          "center_lat": getStorage('routeOptions').lat ?? defaultCenter.lat,
+          "center_long": getStorage('routeOptions').lng ?? defaultCenter.lng,
+          "center_zoom": getStorage('routeOptions').zoom ?? defaultCenter.zoom,
+        }
+      })
+      .then(response =>{
+        if(response.statusCode === 400){
+          console.log('Something was wrong in setMapOptions post call')
+        }else{
+          console.log('The route center params were updated...')
+        }
+      })
+    }
+
   }
 
   function renderRoutesSelector(){
@@ -151,7 +155,7 @@ const HomePage = () => {
     }
     return (options.length > 1 )
       ? <>
-          <Label htmlFor="selected-route">Create new or edit existent...</Label>
+          {/*<Label htmlFor="selected-route">Create new or edit existent...</Label>*/}
           <Select
             name="selected-route"
             value={routeId}
@@ -163,10 +167,10 @@ const HomePage = () => {
         </>
       : <>
           <br/>
-          <Label className={'head-advisory'}>{username}, add your routes!!</Label>
-          <Label className={'advisory'}> • Trace a Route for boats</Label>
-          <Label className={'advisory'}> • Set at least one Place</Label>
-          <Label className={'advisory'}> • Don't forget to publish! ;)</Label>
+          <Label htmlFor='' className={'head-advisory'}>{username}, add your routes!!</Label>
+          <Label htmlFor='' className={'advisory'}> • Trace a Route for boats</Label>
+          <Label htmlFor='' className={'advisory'}> • Set at least one Place</Label>
+          <Label htmlFor='' className={'advisory'}> • Don't forget to publish! ;)</Label>
         </>
   }
 
@@ -190,6 +194,7 @@ const HomePage = () => {
         
         map.current.addControl(Draw, 'top-left');
   
+        map.current.resize()
         map.current.addControl(new MapboxGLGeocoder({
           accessToken: MapboxGL.accessToken,
           marker: false
@@ -203,17 +208,16 @@ const HomePage = () => {
         map.current.on('draw.delete', (e)=>{ updateRoute(e, Draw.getAll()) })
   
         map.current.addControl(new MapboxLanguage());
-        //map.current.addControl(new MapboxGL.FullscreenControl());
-        //map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
+        map.current.addControl(new MapboxGL.FullscreenControl());
+        map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
   
         // Draw temporary stored map!!
         if(getStorage('currentRoute')){
+          Draw.deleteAll();
           Draw.add(getStorage('currentRoute'))
-        }
+        }        
   
-        map.current.resize()
-  
-      })  
+      })
 
     }
 
@@ -234,8 +238,7 @@ const HomePage = () => {
       fetch(routesOrigin+'/'+selectedRouteId)
       .then((res) => res.json())
       .catch(error => console.error('Error:', error))
-      .then(response => {
-        resetRouteDraw()
+      .then(response => {        
         if(response){
           resetToEditonMode(response)
         }else{
@@ -247,19 +250,20 @@ const HomePage = () => {
 
   function resetToCreationMode(){
     console.log('CREATION MODE!')
+    resetPublishButton()
+    resetRouteDraw()
     storeRouteMode('creation')
     storeRouteId(0)
     storeRouteName('')
     storeRouteLabel('')
     storeRouteDescription('')
-    resetPublishButton()
-    resetRouteDraw()
-    flyTo(defaultCenter.lat, defaultCenter.lng, defaultCenter.zoom+5)
+    flyTo(defaultCenter.lat, defaultCenter.lng, defaultCenter.zoom)
     setTimeout(function(){setIsLoading(false)},2000)
   }
 
   function resetToEditonMode(response){
     console.log('EDITION MODE!::'+response.id)
+    resetRouteDraw()
     storeRouteMode('edition')
     storeRouteId(response.id);
     storeRouteName(response.name)
@@ -352,7 +356,7 @@ const HomePage = () => {
           var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
           var description   = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
           var isLineString  = mapElement.features[0].geometry.type === 'LineString'
-          var type          = mapElement.features[0].geometry.type;
+          var type          = mapElement.features[0].geometry.type
 
           postData(routesOrigin, {
             "name": name,
@@ -363,7 +367,7 @@ const HomePage = () => {
               "label": label,
               "description": description
             }],
-            'map_data': setMapData(mapElement, mapElement.features[0])
+            'map_data':  setMapData(isLineString ? mapElement.features[0] : '')
           })
           .then(res => {
 
@@ -385,7 +389,8 @@ const HomePage = () => {
                 storeRouteDescription(description)  
                 storePublishButtonStatus(!true)
                 storeRoute(res.map_data.data)
-                setAlert('GRETTINGS!:\n\nYou have created a new route!')
+                setAlert('You have created a new route!', 'GRETTINGS!')
+
               }else{
 
                 if(type === 'Point'){
@@ -563,7 +568,7 @@ const HomePage = () => {
     })
     .then(data => {
       if(data.statusCode === 400){
-        console.log('Something was wrong with this action...')
+        console.log('Something was wrong with creating a Place...')
       }else{
         console.log('Place '+placeFeatures.id+' posted successful ;)')
         setPlaceModalStatus(false)
@@ -680,7 +685,7 @@ const HomePage = () => {
     console.log(Route)
 
     if(Route === []) return false
-
+/*
     // Analizing the data to save :)
     if(Route.features.length > 0){
 
@@ -711,7 +716,7 @@ const HomePage = () => {
     }else{ 
       if(!launchToast("You haven't created a route. Please, print at least a Route!")) return false
     }
-
+*/
     return true;
 
   }
@@ -759,7 +764,7 @@ const HomePage = () => {
   
   function showChangeAdvisory(){
     let adv = getStorage('routeChangesAdvisory','string')
-    if(adv===false){
+    if(!adv){
       if(window.confirm('Do you want to edit this route?')){
         storeChangeAdvisory(true)
         return true
@@ -772,7 +777,7 @@ const HomePage = () => {
 
   function showCreationAdvisory(){
     let adv = getStorage('routeCreationAdvisory','string')
-    if(adv===false){   
+    if(!adv){   
       if(window.confirm('Do you want to create a new route?')){
         storeCreationAdvisory(Date.now())
         return true
@@ -929,8 +934,9 @@ const HomePage = () => {
     )
   }
 
-  function setAlert(message){
+  function setAlert(message, label=''){
     setAlertModalMessage(message)
+    setAlertModalLabel(label)
     setAlertModalStatus(true)
   }
 
@@ -947,9 +953,9 @@ const HomePage = () => {
         shouldCloseOnOverlayClick={true}
       >
         <div style={{minHeight :'90%'}}>
-          <Label htmlFor="input" message={'Pay attention'} style={{fontWeight: 'bold'}} />
+          <Label htmlFor="input" style={{color: 'white'}} message={alertModalLabel}/>
           <Label htmlFor="input" message={alertModalMessage} />
-        </div>
+        </div> 
         <Button
           label={'OK'}            
           color={publishButtonColor}
@@ -962,11 +968,11 @@ const HomePage = () => {
   return (
     <>
       <div className="row">
-        <div className="col-lg-8 col-md-8">
+        <div className="col-9 col-md-9">
           <div ref={mapContainer} className="map-container" />
           <div className="nav-bar">Longitude: {focusLng.toFixed(4)} • Latitude: {focusLat.toFixed(4)} • Zoom: {Math.round(focusZoom)}</div>
         </div>
-        <div className="col-md-4 col-lg-4">
+        <div className="col-md-3 col-lg-3">
           <div className='row'>
             <div className='col-6' style={{textAlign: 'center'}}>
               <Button
@@ -990,11 +996,12 @@ const HomePage = () => {
             </div>
           </div>
           <br/>  
-          <div className='row'>
-            {renderRoutesSelector()}
-            <LoadingBar style={{width:'100%', opacity: isLoading ? 99 : 0}}/>
+          <div className='col-12'>
+            <div className='row'>
+              {renderRoutesSelector()}
+              <LoadingBar style={{width:'100%', opacity: isLoading ? 99 : 0}}/>
+            </div>
           </div>
-          <br/>  
           <div className='col-12'>
             <div className='row'>
               <Label htmlFor="route-name">Name</Label>
@@ -1047,4 +1054,4 @@ const HomePage = () => {
 
 }
 
-export default HomePage
+export default memo(HomePage)

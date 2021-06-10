@@ -1,5 +1,5 @@
-import React, { memo, useRef, useEffect, useState } from 'react'
-
+/* eslint-disable */
+import React, { useRef, useState, useEffect, memo, useMemo } from 'react';
 
 import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core'
 import 'react-tabs/style/react-tabs.css'
@@ -38,11 +38,6 @@ const mapTile = 'mapbox://styles/mapbox/streets-v11'
 // Map vars
 const placesLimit = 12
 
-// User params
-const username = 'Hello';//get(auth.getUserInfo(), 'firstname', '')
-const user_id = 12;//get(auth.getUserInfo(), 'id', '')
-setStorage('STRAPI_UPDATE_NOTIF', true, 'string')
-
 //const routesLimit = 10;
 //const publishEnabled = false
 
@@ -59,6 +54,16 @@ const mapStyle = {
 
 const HomePage = () => {
   
+  // User params  
+  localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
+  const username = 'David';//get(auth.getUserInfo(), 'firstname', '')  
+  const user_id = 12;//get(auth.getUserInfo(), 'id', '')
+  if(user_id == ''){
+    location.reload()
+  }else{
+    localStorage.setItem('user_id', user_id)
+  }
+
   // Map Settings
   const map = useRef(null);
   const mapContainer = useRef(null);
@@ -81,7 +86,7 @@ const HomePage = () => {
   const [Route, setRoute] = useState(getStorage('currentRoute', 'json') ?? '')  
   
   //  Route data
-  const [routeId, setRouteId] = useState(getStorage('routeId', 'string'))
+  const [routeId, setRouteId] = useState(getStorage('routeId', 'string') ?? '')
   const [routeIsPublished, setRouteIsPublished] = useState(getStorage('routeIsPublished', 'string') ?? false)  
   const [routeName, setrouteName] = useState(getStorage('routeName', 'string',''))
   const [routeLabel, setrouteLabel] = useState(getStorage('routeLabel', 'string'),'')
@@ -129,7 +134,7 @@ const HomePage = () => {
       lng:  map.current.getCenter().lng,
       zoom: Math.round(map.current.getZoom())
     })
-    if(routeId !== 0 && routeId !== null){
+    /*if(!routeUnselected()){
       putData(routesOrigin+'/'+routeId, {
         'map_data' : {
           "center_lat": getStorage('routeOptions').lat ?? defaultCenter.lat,
@@ -144,8 +149,14 @@ const HomePage = () => {
           console.log('The route center params were updated...')
         }
       })
-    }
+    }*/
 
+  }
+
+  function routeUnselected(){
+    let route_id = getStorage('routeId','string')
+    console.log('The route value is:'+route_id)
+    return route_id == 0 || route_id === null  || route_id == '' || route_id === false
   }
 
   function renderRoutesSelector(){
@@ -224,7 +235,7 @@ const HomePage = () => {
   }
 
   function resetRouteDraw(){
-    setStorage('currentRoute', '{}', 'json')
+    setStorage('currentRoute', '', 'json')
     removeStorage('currentRoute')
     Draw.deleteAll()
     Draw.trash()
@@ -298,7 +309,7 @@ const HomePage = () => {
   }
 
   function flyTo(lat, long, zoom){
-    map.current.flyTo({ center:[ long, lat ], zoom: zoom });
+    map.current.flyTo({ center:[ long, lat ], zoom: zoom })
   }
 
   // Saved  route operations
@@ -313,9 +324,8 @@ const HomePage = () => {
   }
 
   function editionModeAction(mapElement){
-    let route_id = getStorage('routeId', 'string')    
-    if(route_id !== null){      
-      console.log('Edition route mode '+route_id+' action!')
+    if(!routeUnselected()){      
+      console.log('Edition route mode '+routeId+' action!')
       if(showChangeAdvisory()){  
         if(mapElement.action !== undefined){  
           if(mapElement.action === 'change_coordinates' || mapElement.action === 'move'){
@@ -325,10 +335,10 @@ const HomePage = () => {
           }  
         }else{          
           if(mapElement.features[0].geometry.type === 'LineString'){
-            let storedLinesAmount = checkFeaturesAmount(Route, 'LineString');
+            let storedLinesAmount = checkFeaturesAmount(Route, 'LineString')
             if(storedLinesAmount > 1){
               setAlert('You cannot add more than one route. Delete one!')
-              return false;
+              return false
             }  
           }
           switch(mapElement.type){
@@ -344,7 +354,7 @@ const HomePage = () => {
 
   function creationModeAction(mapElement){
 
-    if(routeId === null){
+    if(routeUnselected()){
 
       console.log('Creation mode map action!')
       
@@ -378,6 +388,7 @@ const HomePage = () => {
               console.log('You have created the element id '+res.map_data.data.id+' as route with the id "'+res.id+'"')
 
               storeRouteMode('edition')
+              storeChangeAdvisory(true)
 
               if(isLineString){
 
@@ -396,7 +407,7 @@ const HomePage = () => {
                 if(type === 'Point'){
                   console.log('The element is a Point')
                   //XXX: The point requires a modal to save the textual data
-                  setPlaceModalStatus(true);
+                  resetPlace(true);
                   setStorage('tmpPoint', mapElement.features[0], 'json')    
                 }else if(type === 'Polygon'){
                   console.log('The element is a Polygon')
@@ -410,14 +421,25 @@ const HomePage = () => {
         
         }           
 
-      }        
+      }else{
+        console.log('Burp...')
+      }       
 
     }
 
   }
 
+  function resetPlace(status){
+    setPlaceModalStatus(status)
+    if(!status){
+      setPlaceName('')
+      setPlaceLabel('')
+      setPlaceDescription('')
+    }
+  }
+
   function updateRouteExtra(){
-    if(routeId !== null && routeId !== 0){
+    if(!routeUnselected()){
       if(routeName !== '' && routeLabel !== '' && routeName !== ''){
         putData(routesOrigin+'/'+routeId, {
           "name" : routeName,
@@ -440,18 +462,18 @@ const HomePage = () => {
         "creator": user_id,
         "parent_route": route,
         "element": mapElement.features[0].id,
-        'map_data': setMapData(mapElement)
+        'map_data': setMapData(mapElement.features[0])
       })
-      .then(data => {
-        if(data.statusCode === 400){
+      .then(result => {
+        if(result.statusCode === 400){
           console.log('Something was wrong creating a Polygon')
         }else{
-          console.log('The Polygon '+mapElement.features[0].id+' with the id "'+data.id+'" to the route "'+route+'" was succesfully created!!')
+          console.log('The Polygon '+mapElement.features[0].id+' with the id "'+result.id+'" to the route "'+route+'" was succesfully created!!')
         }
-      });
+      })
     }else if(type === 'Point'){
       // XXX: Call to a Places modal...
-      setPlaceModalStatus(true);
+      resetPlace(true);
       setStorage('tmpPoint', mapElement.features[0], 'json')
     }
   }
@@ -571,7 +593,7 @@ const HomePage = () => {
         console.log('Something was wrong with creating a Place...')
       }else{
         console.log('Place '+placeFeatures.id+' posted successful ;)')
-        setPlaceModalStatus(false)
+        resetPlace(false)
       }
     })
   }
@@ -786,7 +808,7 @@ const HomePage = () => {
         return false
       }
     }
-    return false
+    return true
   }
 
   function deleteRoute(){
@@ -794,17 +816,35 @@ const HomePage = () => {
       let route_id = getStorage('routeId','string')
       getData(routesOrigin+'/'+route_id)
       .then(result=>{
-        deleteData(routesOrigin+'/'+route_id).then(result2=>{
-          for(var i = 0; i < result.places.length; i++ ){
-            deleteData(placesOrigin+'/'+result.places[i].id)
+        deleteData(routesOrigin+'/'+route_id)
+        .then(result2=>{
+          if(result2.statusCode === 400){
+            console.log('Something was wrong deleting places on route delete cascade')
+            return false
+          }else{
+            for(var i = 0; i < result.places.length; i++ ){
+              deleteData(placesOrigin+'/'+result.places[i].id).then(result3=>{
+                if(result3.statusCode === 400){
+                  console.log('Something was wrong deleting places on route delete cascade')
+                }else{
+                  console.log('The Place with  was succesfully deleted')                
+                }
+              })
+            }
+            for(var ii = 0; ii < result.polygons.length; ii++ ){
+              deleteData(polygonsOrigin+'/'+result.polygons[ii].id).then(result4=>{
+                if(result4.statusCode === 400){
+                  console.log('Something was wrong deleting places on route delete cascade')
+                }else{
+                  console.log('The Polygon  was succesfully deleted')                
+                }
+              })
+            }
+            resetToCreationMode()
+            return true
           }
-          for(var ii = 0; ii < result.polygons.length; ii++ ){
-            deleteData(polygonsOrigin+'/'+result.polygons[ii].id)
-          }
-        })
-        resetToCreationMode()
+        })        
       })
-      return true
     }else{
       return false
     }

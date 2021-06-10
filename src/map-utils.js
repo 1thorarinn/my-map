@@ -1,27 +1,35 @@
 import MapboxGLDraw from "@mapbox/mapbox-gl-draw";
 
 export function setStorage(key, data, type='json'){
+    var newKey = setUserKey(key)
     var ret = ( type === 'json')
-        ? localStorage.setItem(key, JSON.stringify(data))
-        : localStorage.setItem(key, data)
+        ? localStorage.setItem(newKey, JSON.stringify(data))
+        : localStorage.setItem(newKey, data)
     return ret
 }
 
+function setUserKey(key){    
+    //let user_id = localStorage.getItem('user_id')
+    //return user_id+'::'+
+    return key
+}
+
 export function getStorage(key, type='json', def=''){
+    var newKey = setUserKey(key)
     var res = ''
     if(def !== ''){
         res = def
-        setStorage(key, def, type)
+        setStorage(newKey, def, type)
     }else{
         res = (type === 'json')
-            ? JSON.parse(localStorage.getItem(key))
-            : localStorage.getItem(key);
+            ? JSON.parse(localStorage.getItem(newKey))
+            : localStorage.getItem(newKey);
     }
     return res
 }
 
 export function removeStorage(key){
-    return localStorage.removeItem(key);
+    return localStorage.removeItem(setUserKey(key));
 }
 
 export function getRouteType(data=[], type='Point'){

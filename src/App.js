@@ -14,8 +14,8 @@ import MapboxGL from 'mapbox-gl'
 import { LoadingBar  } from '@buffetjs/styles';
 
 // Fontawsome...
-//import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+//import { faPlus } from '@fortawesome/free-solid-svg-icons';
 
 import { setStorage, getStorage, getRouteType, alertModalStyle, getData, Draw, placesModalStyle, putData, deleteData, messages, removeStorage, checkFeaturesAmount, postData, makeId } from './map-utils.js';
 
@@ -58,11 +58,11 @@ const HomePage = () => {
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
   const username = 'David';//get(auth.getUserInfo(), 'firstname', '')  
   const user_id = 12;//get(auth.getUserInfo(), 'id', '')
-  if(user_id == ''){
+  if(!user_id){
     location.reload()
-  }else{
-    localStorage.setItem('user_id', user_id)
   }
+  localStorage.setItem('user_id', user_id)
+  
 
   // Map Settings
   const map = useRef(null);
@@ -363,7 +363,7 @@ const HomePage = () => {
         if(mapElement.type === 'draw.create'){
 
           var name          = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route '+newId
-          var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
+          //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
           var description   = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
           var isLineString  = mapElement.features[0].geometry.type === 'LineString'
           var type          = mapElement.features[0].geometry.type
@@ -374,7 +374,7 @@ const HomePage = () => {
             "element" : mapElement.features[0].id,
             "description": [{
               "language": 1,
-              "label": label,
+              "label": name,//label,
               "description": description
             }],
             'map_data':  setMapData(isLineString ? mapElement.features[0] : '')
@@ -391,14 +391,14 @@ const HomePage = () => {
               storeChangeAdvisory(true)
 
               if(isLineString){
-
                 // Setting main inputs ;)
                 console.log('The element is a LineString')
                 storeRouteId(res.id)
                 storeRouteName(name)
-                storeRouteLabel(label)
+                //storeRouteLabel(label)
                 storeRouteDescription(description)  
-                storePublishButtonStatus(!true)
+                //storePublishButtonStatus(!true)
+                
                 storeRoute(res.map_data.data)
                 setAlert('You have created a new route!', 'GRETTINGS!')
 
@@ -415,6 +415,9 @@ const HomePage = () => {
                 }
 
               }
+
+              setPublishable()
+
             }
 
           })
@@ -440,7 +443,7 @@ const HomePage = () => {
 
   function updateRouteExtra(){
     if(!routeUnselected()){
-      if(routeName !== '' && routeLabel !== '' && routeName !== ''){
+      if(routeName !== '' && routeDescription !== ''){//&& routeLabel !== ''
         putData(routesOrigin+'/'+routeId, {
           "name" : routeName,
           "description":[{
@@ -583,7 +586,7 @@ const HomePage = () => {
       "element": placeFeatures.id,
       "description": [{
         "language": 1,
-        "label": placeLabel,
+        "label": placeName,// 'New route label',
         "description": placeDescription
       }],
       'map_data': setMapData(placeFeatures)
@@ -673,16 +676,18 @@ const HomePage = () => {
   }
 
   function togglePublished(){
+
     if(routeIsPublished){
       console.log('Unpublishing??')
-      if(window.confirm('ALERT:\nIf you continue the route will disapear from the app after next data uprgade\n\nDo you wanna unpublish the route?')){         
+      if(window.confirm('ALERT:\nIf you continue the route will disapear from the app after next app data upgrade\n\nDo you wanna unpublish the route?')){         
         storeRouteIsPublished(false)
       }else{
         return false
       }
     }else{
+      
       if(validatePublishing()){
-        if(window.confirm('ALERT:\nIf you continue the route will appear from the app after next data uprgade\n\nDo you wanna publish the route?')){         
+        if(window.confirm('ALERT:\nIf you continue the route will appear from the app after next app data upgrade\n\nDo you wanna publish the route?')){         
           storeRouteIsPublished(true)
         }else{
           return false
@@ -704,7 +709,39 @@ const HomePage = () => {
   function validatePublishing() {
 
     console.log('validatePublishing attempt... is Route! ;))')
-    console.log(Route)
+    getData(routesOrigin+'/'+routeId)
+    .then(result=>{
+
+      if(result.description.length === ''){
+        launchToast('To publish a good quality Route, please set at least a description...')
+        return false
+      }else if(result.images.length === 0){
+        launchToast('To publish a good quality Route, please set at least a representative Image to your route...')
+        return false
+      }else if(result.places.length === 0){
+        launchToast('To publish a good quality Route, please set at least a Place...')
+        return false
+      }else{
+        for( var i = 0; i < result.places.length; i++){
+          console.log(result.places[i])
+          if(result.places[i].description === ''){
+            launchToast('To publish a good quality route please set your Place Descriptions...')
+            return false
+          }
+          if(result.places[i].images.length === 0){
+            launchToast('We encourage you to set all the Places Image before publish...')
+            return false
+          }
+          if(result.places[i].map_marker === null){
+            launchToast('We encourage you to set all the Places Map Markers before publish...')
+            return false
+          }
+        }
+      }
+
+      console.log([result.description.length, result.images.length, result.places.length])
+      return true
+    })
 
     if(Route === []) return false
 /*
@@ -739,7 +776,7 @@ const HomePage = () => {
       if(!launchToast("You haven't created a route. Please, print at least a Route!")) return false
     }
 */
-    return true;
+    
 
   }
 
@@ -758,8 +795,8 @@ const HomePage = () => {
     storePublishButtonLabel('Unpublish')
   }
 
-  function launchToast(message, doContinue=false){
-    setAlert(message)
+  function launchToast(message, doContinue=false, label){
+    setAlert(message, label)
     return doContinue
   }
 
@@ -880,7 +917,7 @@ const HomePage = () => {
     event.preventDefault()
     var mapElement = getStorage('tmpPoint', 'json')
     if(mapElement !== ''){//Undo
-      if(placeName === '' && placeLabel === '' && placeDescription === ''){
+      if(placeName === '' && placeDescription === ''){//&& placeLabel === '' 
         return false
       }else{
         postPlace(mapElement) 
@@ -919,7 +956,7 @@ const HomePage = () => {
           <div className='row'>
             <span style={{color: placeName ? 'white' : 'red'}}>Please, set a place name...</span>
           </div>
-          <div className='row'>
+          {/*<div className='row'>
             <Label htmlFor="place-label">Label</Label>
             <InputText
               type='text'
@@ -934,7 +971,7 @@ const HomePage = () => {
           </div>
           <div className='row'>
             <span style={{color: placeLabel ? 'white' : 'red'}}>Please, set a place label...</span>
-          </div>
+          </div>*/}
           <div className='row'>
             <Label htmlFor="place-description">Description</Label>
             <Textarea
@@ -942,7 +979,7 @@ const HomePage = () => {
               className={'description'}
               placeholder='Set here the description for this place...'
               required={true}
-              style={{maxHeight: '361px', height: '361px'}}
+              style={{maxHeight: '261px', height: '261px'}}
               onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
               value={placeDescription}
             />
@@ -1057,7 +1094,7 @@ const HomePage = () => {
             <div className='row'>
               <span style={{color: routeName ? 'white' : 'red'}}>Please, set a route name...</span>
             </div>
-            <div className='row'>
+            {/*<div className='row'>
               <Label htmlFor="route-label">Label</Label>
               <InputText
                 type='text'
@@ -1070,7 +1107,7 @@ const HomePage = () => {
             </div>
             <div className='row'>
               <span style={{color: routeLabel ? 'white' : 'red'}}>Please, set a route label...</span>
-            </div>
+            </div>*/}
             <div className='row'>
               <Label htmlFor="route-description">Description</Label>
               <Textarea

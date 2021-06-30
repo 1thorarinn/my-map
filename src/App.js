@@ -8,6 +8,10 @@ import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import { Header } from '@buffetjs/custom';
 //import RouteSelector from './RouteSelector.js'
 
+import routeIcon from './routeIcon.png'
+import placeIcon from './placeIcon.png'
+import polygonIcon from './polygonIcon.png'
+
 import MapboxGL from 'mapbox-gl'
 
 // BuffetJS
@@ -179,8 +183,9 @@ const HomePage = () => {
       : <>
           <br/>
           <Label htmlFor='' className={'head-advisory'}>{username}, add your routes!!</Label>
-          <Label htmlFor='' className={'advisory'}> • Trace a Route for boats</Label>
-          <Label htmlFor='' className={'advisory'}> • Set at least one Place</Label>
+          <Label htmlFor='' className={'advisory'}> • <img src={routeIcon} alt="Logo" /> Trace a boat Route</Label>
+          <Label htmlFor='' className={'advisory'}> • <img src={placeIcon} alt="Logo" /> Set at least one Place</Label>
+          <Label htmlFor='' className={'advisory'}> • <img src={polygonIcon} alt="Logo" /> Set warning Polygons</Label>
           <Label htmlFor='' className={'advisory'}> • Don't forget to publish! ;)</Label>
         </>
   }
@@ -929,7 +934,7 @@ const HomePage = () => {
     }    
   }
 
-  function getEditPlaceModal(){
+  function editPlaceModal(){
     return (
       <Modal
         isOpen={placeModalStatus}
@@ -1124,7 +1129,7 @@ const HomePage = () => {
           </div>
         </div>
       </div>
-      {getEditPlaceModal()}
+      {editPlaceModal()}
       {alertModal()}
     </>
   )

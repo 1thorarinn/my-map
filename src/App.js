@@ -12,6 +12,9 @@ import routeIcon from './routeIcon.png'
 import placeIcon from './placeIcon.png'
 import polygonIcon from './polygonIcon.png'
 
+
+var changed = false
+
 import MapboxGL from 'mapbox-gl'
 
 // BuffetJS
@@ -69,12 +72,12 @@ const HomePage = () => {
   
 
   // Map Settings
-  const map = useRef(null);
-  const mapContainer = useRef(null);
+  const map = useRef(null)
+  const mapContainer = useRef(null)
   const [newId, setNewId] = useState(makeId(6)) 
 
   // Client routes for the select button
-  const [clientRoutes, setClientRoutes] = useState([]);
+  const [clientRoutes, setClientRoutes] = useState([])
 
   //  Map
   const [mapOpts, setRouteOptions] = useState(getStorage('routeOptions') ?? defaultCenter)
@@ -92,7 +95,7 @@ const HomePage = () => {
   //  Route data
   const [routeId, setRouteId] = useState(getStorage('routeId', 'string') ?? '')
   const [routeIsPublished, setRouteIsPublished] = useState(getStorage('routeIsPublished', 'string') ?? false)  
-  const [routeName, setrouteName] = useState(getStorage('routeName', 'string',''))
+  const [routeName, setRouteName] = useState(getStorage('routeName', 'string',''))
   const [routeLabel, setrouteLabel] = useState(getStorage('routeLabel', 'string'),'')
   const [routeDescription, setRouteDescription] = useState(getStorage('routeDescription', 'string') ?? '')
 
@@ -104,10 +107,10 @@ const HomePage = () => {
   const [deleteButtonStatus, setDeleteButtonStatus] = useState(getStorage('deleteButtonStatus', 'string') ?? false)
 
   // New Place data
-  const [placeModalStatus, setPlaceModalStatus] = useState(false);
-  const [alertModalStatus, setAlertModalStatus] = useState(false);
-  const [alertModalMessage, setAlertModalMessage] = useState('');
-  const [alertModalLabel, setAlertModalLabel] = useState('');
+  const [placeModalStatus, setPlaceModalStatus] = useState(false)
+  const [alertModalStatus, setAlertModalStatus] = useState(false)
+  const [alertModalMessage, setAlertModalMessage] = useState('')
+  const [alertModalLabel, setAlertModalLabel] = useState('')
 
   const [placeName, setPlaceName] = useState('')
   const [placeLabel, setPlaceLabel] = useState('')
@@ -122,12 +125,12 @@ const HomePage = () => {
   useEffect(() => { 
     fetch(routesOrigin+'?created_by='+user_id)
     .then((res) => res.json())
-    .then(setClientRoutes); 
-  },[routeId, routeName]);
+    .then(setClientRoutes)
+  },[routeName])
 
   useEffect(() => {
     loadMap()
-  },[routeId]);
+  },[routeId])
 
   function setMapOptions(){
     setMapLat(map.current.getCenter().lat)
@@ -168,26 +171,59 @@ const HomePage = () => {
     for(var i = 0; i < clientRoutes.length; i++){
       options.push({ value: clientRoutes[i].id.toString(), label: clientRoutes[i].name ?? '' })
     }
-    return (options.length > 1 )
-      ? <>
-          {/*<Label htmlFor="selected-route">Create new or edit existent...</Label>*/}
-          <Select
-            name="selected-route"
-            value={routeId}
-            options={options}
-            closeMenuOnSelect={true}
-            style={{width: '97%'}}
-            onChange={({ target: { value } }) => { loadRoute(value) }}
-          />
-        </>
-      : <>
-          <br/>
-          <Label htmlFor='' className={'head-advisory'}>{username}, add your routes!!</Label>
-          <Label htmlFor='' className={'advisory'}> • <img src={routeIcon} alt="Logo" /> Trace a boat Route</Label>
-          <Label htmlFor='' className={'advisory'}> • <img src={placeIcon} alt="Logo" /> Set at least one Place</Label>
-          <Label htmlFor='' className={'advisory'}> • <img src={polygonIcon} alt="Logo" /> Set warning Polygons</Label>
-          <Label htmlFor='' className={'advisory'}> • Don't forget to publish! ;)</Label>
-        </>
+    return (
+      <>
+        <Label htmlFor='' className={'head-advisory'}>{username}, edit your routes!</Label>
+        <Select
+          name="selected-route"
+          value={routeId}
+          options={options}
+          closeMenuOnSelect={true}
+          style={{width: '97%'}}
+          onChange={({ target: { value } }) => { loadRoute(value) }}>        
+        </Select>
+      </>
+    )
+    
+  }
+
+  function updater(){
+    setTimeout(function(){
+      console.log(' Changed is :'+changed)
+      if(changed){
+        updateRouteExtra()
+        changed = false
+        return false
+      }
+      updater()
+    },10000)
+  }
+
+  const instructions = () => {
+    return(<>
+      <div className='row'>
+        <Label htmlFor="route-name">Edit name</Label>
+        <InputText
+          type='text'
+          name='route-name'
+          value={routeName} 
+          placeholder='Set the route name...'
+          required={true}
+          onChange={({ target: { value } }) =>{storeRouteName(value)}}
+        />
+      </div>
+      <div className='row'>
+        <span style={{color: routeName ? 'white' : 'red'}}>Please, set a route name...</span>
+      </div>
+      <div className='advisory-box'>
+        <ul>          
+          <li><Label htmlFor='' className={'advisory'}><img src={routeIcon} alt="Routes"/> Trace a boat Route</Label></li>
+          <li><Label htmlFor='' className={'advisory'}><img src={placeIcon} alt="Places"/> Set at least one Place</Label></li>
+          <li><Label htmlFor='' className={'advisory'}><img src={polygonIcon} alt="Polygons"/> Set warning Polygons</Label></li>
+          <li><Label htmlFor='' className={'advisory center'}>Don't forget to publish!</Label></li>   
+        </ul>
+      </div>
+    </>)
   }
 
   function loadMap(){
@@ -637,7 +673,10 @@ const HomePage = () => {
   }
 
   function storeRouteName(name){
-    setrouteName(name)
+    setPlaceLabel(name)
+    changed = true
+    updater()
+    setRouteName(name)
     setStorage('routeName', name, 'string')
     updateRouteExtra()
     return name
@@ -946,7 +985,7 @@ const HomePage = () => {
             <Label htmlFor="place-name"><h2>Set the place data</h2></Label>
           </div>
           <div className='row'>
-            <Label htmlFor="place-name">Name</Label>
+            <Label htmlFor="place-name">Edit Route Name</Label>
             <InputText
               type='text'
               name='place-name'
@@ -1050,11 +1089,11 @@ const HomePage = () => {
   return (
     <>
       <div className="row">
-        <div className="col-9 col-md-9">
+        <div className="col-8 col-md-8">
           <div ref={mapContainer} className="map-container" />
           <div className="nav-bar">Longitude: {focusLng.toFixed(4)} • Latitude: {focusLat.toFixed(4)} • Zoom: {Math.round(focusZoom)}</div>
         </div>
-        <div className="col-md-3 col-lg-3">
+        <div className="col-md-4 col-lg-4">
           <div className='row'>
             <div className='col-6' style={{textAlign: 'center'}}>
               <Button
@@ -1085,20 +1124,7 @@ const HomePage = () => {
             </div>
           </div>
           <div className='col-12'>
-            <div className='row'>
-              <Label htmlFor="route-name">Name</Label>
-              <InputText
-                type='text'
-                name='route-name'
-                value={routeName} 
-                placeholder='Set the route name...'
-                required={true}
-                onChange={({ target: { value } }) =>{storeRouteName(value)}}
-              />
-            </div>
-            <div className='row'>
-              <span style={{color: routeName ? 'white' : 'red'}}>Please, set a route name...</span>
-            </div>
+            {instructions()}
             {/*<div className='row'>
               <Label htmlFor="route-label">Label</Label>
               <InputText
@@ -1113,7 +1139,7 @@ const HomePage = () => {
             <div className='row'>
               <span style={{color: routeLabel ? 'white' : 'red'}}>Please, set a route label...</span>
             </div>*/}
-            <div className='row'>
+            <div className='row route-creator'>
               <Label htmlFor="route-description">Description</Label>
               <Textarea
                 name="route-description"

@@ -2,20 +2,16 @@
 import React, { useRef, useState, useEffect, memo, useMemo } from 'react';
 
 import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core'
+
 import 'react-tabs/style/react-tabs.css'
 import Modal from 'react-modal'
 import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import { Header } from '@buffetjs/custom';
-//import RouteSelector from './RouteSelector.js'
+import MapboxGL from 'mapbox-gl'
 
 import routeIcon from './routeIcon.png'
 import placeIcon from './placeIcon.png'
 import polygonIcon from './polygonIcon.png'
-
-
-var changed = false
-
-import MapboxGL from 'mapbox-gl'
 
 // BuffetJS
 import { LoadingBar  } from '@buffetjs/styles';
@@ -31,6 +27,7 @@ import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './index.css'
+import { Toast } from 'bootstrap';
 
 const host ='http://161.97.167.92:1337';
 MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg"
@@ -63,8 +60,8 @@ const HomePage = () => {
   
   // User params  
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
-  const username = 'David';//get(auth.getUserInfo(), 'firstname', '')  
-  const user_id = 12;//get(auth.getUserInfo(), 'id', '')
+  const username = 'asdfas';//get(auth.getUserInfo(), 'firstname', '')  
+  const user_id = 12; //get(auth.getUserInfo(), 'id', '')
   if(!user_id){
     location.reload()
   }
@@ -95,7 +92,7 @@ const HomePage = () => {
   //  Route data
   const [routeId, setRouteId] = useState(getStorage('routeId', 'string') ?? '')
   const [routeIsPublished, setRouteIsPublished] = useState(getStorage('routeIsPublished', 'string') ?? false)  
-  const [routeName, setRouteName] = useState(getStorage('routeName', 'string',''))
+  const [routeName, setRouteName] = useState('')
   const [routeLabel, setrouteLabel] = useState(getStorage('routeLabel', 'string'),'')
   const [routeDescription, setRouteDescription] = useState(getStorage('routeDescription', 'string') ?? '')
 
@@ -125,7 +122,9 @@ const HomePage = () => {
   useEffect(() => { 
     fetch(routesOrigin+'?created_by='+user_id)
     .then((res) => res.json())
-    .then(setClientRoutes)
+    .then((data)=>{
+      setClientRoutes(data)
+    })
   },[routeName])
 
   useEffect(() => {
@@ -176,6 +175,7 @@ const HomePage = () => {
         <Label htmlFor='' className={'head-advisory'}>{username}, edit your routes!</Label>
         <Select
           name="selected-route"
+          className='primary'
           value={routeId}
           options={options}
           closeMenuOnSelect={true}
@@ -187,6 +187,7 @@ const HomePage = () => {
     
   }
 
+  /*
   function updater(){
     setTimeout(function(){
       console.log(' Changed is :'+changed)
@@ -197,7 +198,7 @@ const HomePage = () => {
       }
       updater()
     },10000)
-  }
+  }*/
 
   const instructions = () => {
     return(<>
@@ -310,7 +311,7 @@ const HomePage = () => {
     storeRouteLabel('')
     storeRouteDescription('')
     flyTo(defaultCenter.lat, defaultCenter.lng, defaultCenter.zoom)
-    setTimeout(function(){setIsLoading(false)},2000)
+    setTimeout(function(){setIsLoading(false)},3000)
   }
 
   function resetToEditonMode(response){
@@ -318,13 +319,13 @@ const HomePage = () => {
     resetRouteDraw()
     storeRouteMode('edition')
     storeRouteId(response.id);
-    storeRouteName(response.name)
+    setRouteName(response.name)
     storeRouteLabel(response.description[0].label)
     storeRouteDescription(response.description[0].description)
     storeRouteIsPublished(response.published)
     drawSelectedRoute(response)
     flyTo(response.map_data.center_lat, response.map_data.center_long, response.map_data.center_zoom)
-    setTimeout(function(){setIsLoading(false)},2000)
+    setTimeout(function(){setIsLoading(false)},3000)
   }
 
   function drawSelectedRoute(response){
@@ -436,7 +437,7 @@ const HomePage = () => {
                 console.log('The element is a LineString')
                 storeRouteId(res.id)
                 storeRouteName(name)
-                //storeRouteLabel(label)
+                storeRouteLabel(name)
                 storeRouteDescription(description)  
                 //storePublishButtonStatus(!true)
                 
@@ -483,18 +484,20 @@ const HomePage = () => {
   }
 
   function updateRouteExtra(){
+    setIsLoading(true)
     if(!routeUnselected()){
       if(routeName !== '' && routeDescription !== ''){//&& routeLabel !== ''
         putData(routesOrigin+'/'+routeId, {
           "name" : routeName,
           "description":[{
             "language" : 1,
-            "label" : routeLabel,
+            "label" : routeName,
             "description" : routeDescription
           }]
         })
       }
-    }
+    }    
+    setIsLoading(false)
   }
 
   function createMapElement(mapElement){
@@ -674,8 +677,6 @@ const HomePage = () => {
 
   function storeRouteName(name){
     setPlaceLabel(name)
-    changed = true
-    updater()
     setRouteName(name)
     setStorage('routeName', name, 'string')
     updateRouteExtra()
@@ -720,11 +721,12 @@ const HomePage = () => {
   }
 
   function togglePublished(){
-
+    var published = true
+    
     if(routeIsPublished){
       console.log('Unpublishing??')
       if(window.confirm('ALERT:\nIf you continue the route will disapear from the app after next app data upgrade\n\nDo you wanna unpublish the route?')){         
-        storeRouteIsPublished(false)
+        published = false        
       }else{
         return false
       }
@@ -732,7 +734,7 @@ const HomePage = () => {
       
       if(validatePublishing()){
         if(window.confirm('ALERT:\nIf you continue the route will appear from the app after next app data upgrade\n\nDo you wanna publish the route?')){         
-          storeRouteIsPublished(true)
+          published = true          
         }else{
           return false
         }
@@ -740,40 +742,46 @@ const HomePage = () => {
         return false
       }
     }
-    let publishedStatus ={
-      "published" : ! routeIsPublished
-    }
-    putData(routesOrigin+'/'+routeId, publishedStatus)        
+    
+    storeRouteIsPublished(published)
+
+    putData(routesOrigin+'/'+routeId, { published: published })        
     .then(data => {
-      let action = ( ( ! routeIsPublished ) ? 'published' : 'unpublished' )
-      console.log('The Route '+routeId+' succesfully '+action)
-    })
+      let action = ( ( ! publishedStatus.published ) ? 'published' : 'unpublished' )
+      toast('The Route '+routeId+' was succesfully '+action+'!')
+    })    
   }
 
   function validatePublishing() {
 
     console.log('validatePublishing attempt... is Route! ;))')
+    
+    if(Route === []) return false
+
     getData(routesOrigin+'/'+routeId)
     .then(result=>{
 
+     /* Only if routes have more data... 
       if(result.description.length === ''){
         launchToast('To publish a good quality Route, please set at least a description...')
         return false
       }else if(result.images.length === 0){
         launchToast('To publish a good quality Route, please set at least a representative Image to your route...')
         return false
-      }else if(result.places.length === 0){
+      }else*/ 
+      
+      /*if(result.places.length === 0){
         launchToast('To publish a good quality Route, please set at least a Place...')
         return false
       }else{
         for( var i = 0; i < result.places.length; i++){
           console.log(result.places[i])
           if(result.places[i].description === ''){
-            launchToast('To publish a good quality route please set your Place Descriptions...')
+            launchToast('To publish a good quality Route please set your Place descriptions...')
             return false
           }
           if(result.places[i].images.length === 0){
-            launchToast('We encourage you to set all the Places Image before publish...')
+            launchToast('We encourage you to set all the Place Images before publish...')
             return false
           }
           if(result.places[i].map_marker === null){
@@ -782,44 +790,13 @@ const HomePage = () => {
           }
         }
       }
-
-      console.log([result.description.length, result.images.length, result.places.length])
       return true
+*/
+return true
     })
 
-    if(Route === []) return false
-/*
-    // Analizing the data to save :)
-    if(Route.features.length > 0){
+    
 
-      console.log('Routes::Features!!')
-      console.log(Route.features)
-
-      // 1.- Only a Linestring is allowed!! Not two      
-
-        let storedLinesAmount = checkFeaturesAmount(Route, 'LineString');
-        if(storedLinesAmount > 1 ){
-          if(!launchToast('You are unable to draw two lines for a route. \n\n You must delete '+(storedLinesAmount-1)+' lines\n')) return false
-        }else if(storedLinesAmount === 0){
-          if(!launchToast('You must draw one route, at least')) return false
-        }          
-
-      // 2.- Now you will set the first location (meeting-point)
-
-        let storedPointsAmount = checkFeaturesAmount(Route, 'Point');
-        if(storedPointsAmount < 1 ){
-          if (!window.confirm("You don't have addressed any Place to your route. \nWe encourage you to put, at least, one Place Marker ;)\n\n Do you really want to save?\n\n")) {
-            setAlert('You canceled to save this Route')
-            return false
-          }
-        }else if(storedPointsAmount > placesLimit ){
-          if(!launchToast('You have passed the amount limit of Places on your route. Please, the limit are '+placesLimit)) return false
-        }
-
-    }else{ 
-      if(!launchToast("You haven't created a route. Please, print at least a Route!")) return false
-    }
-*/
     
 
   }

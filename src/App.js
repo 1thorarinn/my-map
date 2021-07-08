@@ -91,7 +91,7 @@ const HomePage = () => {
   
   //  Route data
   const [routeId, setRouteId] = useState(getStorage('routeId', 'string') ?? '')
-  const [routeIsPublished, setRouteIsPublished] = useState(getStorage('routeIsPublished', 'string') ?? false)  
+  const [routeIsPublished, setRouteIsPublished] = useState(setStorage('routeIsPublished', 'string') ?? false)  
   const [routeName, setRouteName] = useState('')
   const [routeLabel, setrouteLabel] = useState(getStorage('routeLabel', 'string'),'')
   const [routeDescription, setRouteDescription] = useState(getStorage('routeDescription', 'string') ?? '')
@@ -122,16 +122,15 @@ const HomePage = () => {
   useEffect(() => { 
     fetch(routesOrigin+'?created_by='+user_id)
     .then((res) => res.json())
-    .then((data)=>{
-      setClientRoutes(data)
-    })
-  },[routeName])
+    .then(setClientRoutes)
+  },[routeId, routeName])
 
   useEffect(() => {
     loadMap()
   },[routeId])
 
   function setMapOptions(){
+    console.log('This is a map action!')
     setMapLat(map.current.getCenter().lat)
     setMapLng(map.current.getCenter().lng)
     setMapZoom(Math.round(map.current.getZoom()))
@@ -187,19 +186,6 @@ const HomePage = () => {
     
   }
 
-  /*
-  function updater(){
-    setTimeout(function(){
-      console.log(' Changed is :'+changed)
-      if(changed){
-        updateRouteExtra()
-        changed = false
-        return false
-      }
-      updater()
-    },10000)
-  }*/
-
   const instructions = () => {
     return(<>
       <div className='row'>
@@ -254,11 +240,13 @@ const HomePage = () => {
         }))
   
         map.current.on('move', (e) => { setMapOptions() })
+        map.current.on('click', (e) => { editPlace( e, Draw.getSelected() ) })
   
         map.current.on('draw.add',    (e)=>{ updateRoute(e, Draw.getAll()) })
         map.current.on('draw.create', (e)=>{ updateRoute(e, Draw.getAll()) })
         map.current.on('draw.update', (e)=>{ updateRoute(e, Draw.getAll()) })
         map.current.on('draw.delete', (e)=>{ updateRoute(e, Draw.getAll()) })
+        map.current.on('draw.select', (e)=>{ updateRoute(e, Draw.change()) })
   
         map.current.addControl(new MapboxLanguage());
         map.current.addControl(new MapboxGL.FullscreenControl());
@@ -272,6 +260,19 @@ const HomePage = () => {
   
       })
 
+    }
+
+  }
+
+  function editPlace(e, selected){
+
+    if(selected.features[0].geometry.type === 'Point'){
+      let getUrl = url+'?element='+selected.features[0].id
+      getData(getUrl).then(response=>{
+        let delUrl = url+'/'+response[0].id
+        // Load Places modal
+        editPlaceModal()
+      })
     }
 
   }
@@ -433,6 +434,7 @@ const HomePage = () => {
               storeChangeAdvisory(true)
 
               if(isLineString){
+
                 // Setting main inputs ;)
                 console.log('The element is a LineString')
                 storeRouteId(res.id)
@@ -720,43 +722,44 @@ const HomePage = () => {
     setStorage('publishButtonStatus', status, 'string')
   }
 
+  function storePublishButtonColor(color){
+    setPublishButtonColor(color)
+    setStorage('publishButtonColor', color, 'string')
+  }
+
   function togglePublished(){
-    var published = true
-    
+    console.log('togglePublished: Is published: '+routeIsPublished)
     if(routeIsPublished){
       console.log('Unpublishing??')
       if(window.confirm('ALERT:\nIf you continue the route will disapear from the app after next app data upgrade\n\nDo you wanna unpublish the route?')){         
-        published = false        
+        storeRouteIsPublished(false)     
       }else{
         return false
       }
     }else{
       
       if(validatePublishing()){
+        console.log('Publishing??')
         if(window.confirm('ALERT:\nIf you continue the route will appear from the app after next app data upgrade\n\nDo you wanna publish the route?')){         
-          published = true          
+          storeRouteIsPublished(true)         
         }else{
           return false
         }
       }else{
         return false
       }
-    }
-    
-    storeRouteIsPublished(published)
+    }    
 
-    putData(routesOrigin+'/'+routeId, { published: published })        
+    putData(routesOrigin+'/'+routeId, { published: ! routeIsPublished })        
     .then(data => {
-      let action = ( ( ! publishedStatus.published ) ? 'published' : 'unpublished' )
-      toast('The Route '+routeId+' was succesfully '+action+'!')
-    })    
+      let action = ( ( !  routeIsPublished ) ? 'published' : 'unpublished' )
+      setAlert('The Route "'+routeName+'" was succesfully '+action+'!')
+    })
   }
 
   function validatePublishing() {
 
     console.log('validatePublishing attempt... is Route! ;))')
-    
-    if(Route === []) return false
 
     getData(routesOrigin+'/'+routeId)
     .then(result=>{
@@ -770,34 +773,21 @@ const HomePage = () => {
         return false
       }else*/ 
       
-      /*if(result.places.length === 0){
+      if(result.places.length === 0){
         launchToast('To publish a good quality Route, please set at least a Place...')
         return false
       }else{
         for( var i = 0; i < result.places.length; i++){
-          console.log(result.places[i])
-          if(result.places[i].description === ''){
-            launchToast('To publish a good quality Route please set your Place descriptions...')
-            return false
-          }
-          if(result.places[i].images.length === 0){
-            launchToast('We encourage you to set all the Place Images before publish...')
-            return false
-          }
-          if(result.places[i].map_marker === null){
-            launchToast('We encourage you to set all the Places Map Markers before publish...')
+          if(result.places[i].description === '' || result.places[i].images.length === 0){
+            launchToast('Please set your Place images, markers and descriptions before publish the Route...')
             return false
           }
         }
-      }
-      return true
-*/
-return true
+      }     
+
     })
 
-    
-
-    
+    return true    
 
   }
 
@@ -809,11 +799,13 @@ return true
   function setPublishable(){
     storePublishButtonStatus(true)
     storePublishButtonLabel('Publish')
+    storePublishButtonColor('primary')
   }
 
   function setUnpublishable(){
     storePublishButtonStatus(true)
     storePublishButtonLabel('Unpublish')
+    storePublishButtonColor('success')
   }
 
   function launchToast(message, doContinue=false, label){
@@ -1050,7 +1042,7 @@ return true
         style={alertModalStyle}
         shouldCloseOnOverlayClick={true}
       >
-        <div style={{minHeight :'90%'}}>
+        <div style={{minHeight :'90%', textAlign: 'center'}}>
           <Label htmlFor="input" style={{color: 'white'}} message={alertModalLabel}/>
           <Label htmlFor="input" message={alertModalMessage} />
         </div> 

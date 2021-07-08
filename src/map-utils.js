@@ -43,6 +43,7 @@ export function getRouteType(data=[], type='Point'){
 export const Draw = new MapboxGLDraw({
     displayControlsDefault: true,
     drawing: true,
+    mode: 'draw_line_string',
     controls: {
         polygon: true,
         polyline: true,

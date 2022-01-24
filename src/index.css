@@ -131,3 +131,13 @@ li a:hover {
   opacity: 0;
   transform: translateY(-100px);
 }
+
+.mapbox-gl-draw_point, .mapbox-gl-draw_polygon,.mapbox-gl-draw_trash {
+  display: 'none'!important;
+}
+
+
+.icon, .leaflet-marker-icon {
+  min-height: 25px;
+  animation: blinker 3s linear infinite;
+}

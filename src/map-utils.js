@@ -13,7 +13,7 @@ export const setStorage = (key, data, type = 'json') => {
     return ret
 }
 
-export const getStorage = (key, type = 'json', def = '') => {
+export const getStorage = async (key, type = 'json', def = '') => {
     let newKey = setUserKey(key)
     let res = ''
     if (def !== '') {
@@ -98,7 +98,7 @@ export const alertModalStyle = {
 }
 
 export const messages = {
-    chooseRoute: 'Select a route...'
+    chooseRoute: 'Select to edit...'
 }
 
 // Checking stored LiveMap

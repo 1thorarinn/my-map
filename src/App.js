@@ -103,6 +103,20 @@ const HomePage = () => {
   const [center, setCenter] = useState() // Is the calculated center, related with the routes created
   const [qrUrl, setQrUrl] = useState(null) // QRCode for access this client ;)
 
+  // New Place data
+  const [placeModalStatus, setPlaceModalStatus] = useState(false)
+  const [alertModalStatus, setAlertModalStatus] = useState(false)
+  const [alertModalMessage, setAlertModalMessage] = useState('')
+  const [alertModalLabel, setAlertModalLabel] = useState('')
+  const [alertContent, setAlertContent] = useState(null)
+
+  const [placeId, setPlaceId] = useState(0)
+  const [placeName, setPlaceName] = useState('')
+  const [placeLabel, setPlaceLabel] = useState('')
+  const [placeDescription, setPlaceDescription] = useState('')
+
+  const [routeMarkers, setRouteMarkers] = useState([])
+
   // EDITOR
   const [mode, setMode] = useState()
   const [focus, setFocus] = useState(mapBoxDetails.defCenter)
@@ -120,6 +134,8 @@ const HomePage = () => {
   const [instructions, setInstructions] = useState()
 
   if (typeof (window) !== 'undefined') { Modal.setAppElement('body') }
+
+
 
   const mapObj = {
 
@@ -185,7 +201,7 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
-            {mapObj.editPlaceModal()}
+            {mapObj.routes.place.editModal()}
             {mapObj.alertModal()}
           */}
 
@@ -272,13 +288,44 @@ const HomePage = () => {
       },
 
       setDraw: () => {
-        map.current.on('move', () => mapObj.map.onMove())
-        map.current.on('click', (e) => mapObj.routes.place.onClick(e, Draw.getSelected()))
-        map.current.on('draw.add', (e) => mapObj.draw.onUpdate(e, Draw.getAll()))
-        map.current.on('draw.create', (e) => mapObj.draw.onUpdate(e, Draw.getAll()))
-        map.current.on('draw.select', (e) => mapObj.draw.onUpdate(e, Draw.change()))
-        map.current.on('draw.update', (e) => mapObj.draw.onUpdate(e, Draw.getAll()))
-        map.current.on('draw.delete', (e) => mapObj.draw.onUpdate(e, Draw.getAll()))
+
+        map.current.on('move', () => mapObj.map.actions.move())
+        map.current.on('click', (e) => mapObj.map.actions.click(e, Draw.getSelected()))
+        // Change the cursor to a pointer when the mouse is over the places layer.
+        map.current.on('mouseenter', 'places', () => {
+          map.current.getCanvas().style.cursor = 'pointer'
+        })
+
+        // Change it back to a pointer when it leaves.
+        map.current.on('mouseleave', 'places', () => {
+          map.current.getCanvas().style.cursor = ''
+        })
+
+        map.current.on('draw.add', (e) => mapObj.draw.actions.add(e, Draw.getAll()))
+        map.current.on('draw.create', (e) => mapObj.draw.actions.create(e, Draw.getAll()))
+        map.current.on('draw.select', (e) => mapObj.draw.actions.selected(e, Draw.change()))
+        map.current.on('draw.update', (e) => mapObj.draw.actions.update(e, Draw.getAll()))
+        map.current.on('draw.delete', (e) => mapObj.draw.actions.delete(e, Draw.getAll()))
+
+        /*map.current.on('click', 'places', (e) => {
+          // Copy coordinates array.
+          const coordinates = e.features[0].geometry.coordinates.slice();
+          const description = e.features[0].properties.description;
+           
+          // Ensure that if the map is zoomed out such that multiple
+          // copies of the feature are visible, the popup appears
+          // over the copy being pointed to.
+          while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+          }
+           
+          new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(description)
+          .addTo(map);
+          });
+        */
+
       },
 
       addControls: () => {
@@ -289,15 +336,7 @@ const HomePage = () => {
         map.current.addControl(Draw, 'top-left')
       },
 
-      onMove: () => {
-        let focus = {
-          lat: map.current.getCenter().lat,
-          lng: map.current.getCenter().lng,
-          zoom: Math.round(map.current.getZoom())
-        }
-        setFocus(focus)
-        setStorage('focus', focus)
-      },
+
 
       onDelete: (mapElement) => {
 
@@ -349,9 +388,355 @@ const HomePage = () => {
         })
       },
 
+      setMapData: (features) => {
+
+        console.log(features)
+
+        let focus = getStorage('focus')
+
+        let lat = mapBoxDetails.defCenter.lat
+        let lng = mapBoxDetails.defCenter.lng
+        let zoom = mapBoxDetails.defCenter.zoom
+
+        if (focus) {
+          lat = getStorage('focus').lat
+          lng = getStorage('focus').lng
+          zoom = getStorage('focus').zoom
+        }
+
+        return {
+          'center_lat': lat,
+          'center_long': lng,
+          'center_zoom': zoom,
+          'data': features,
+        }
+
+      },
+
       flyTo: (mapCenter) => {
         if (!mapCenter) return
         map.current.flyTo({ center: [mapCenter.lng, mapCenter.lat], zoom: mapCenter.zoom })
+      },
+
+      actions: {
+
+        move: () => {
+          //console.log('map.actions.move')
+          let focus = {
+            lat: map.current.getCenter().lat,
+            lng: map.current.getCenter().lng,
+            zoom: Math.round(map.current.getZoom())
+          }
+          setFocus(focus)
+          setStorage('focus', focus)
+        },
+
+        click: (e, selected) => {
+          if (selected.features.length > 0) {
+            console.log('map.actions.click', e, selected)
+            let summary = {
+              action: 'click',
+              type: selected.features[0].geometry.type,
+              id: selected.features[0].id,
+              data: selected.features[0]
+            }
+            console.log('map.select', summary)
+            setStorage('selectedElement', summary)
+          } else {
+            //CXlick on the map and unhold selected element from memory!!!
+            setStorage('selectedElement', null)
+          }
+
+
+          /*if (selected && selected.features.length > 0) {
+
+            getData(placesOrigin + '?element=' + selected.features[0].id)
+              .then(data => {
+                if (data.lenght > 0) {
+                  setPlace({
+                    id: data[0].element,
+                    name: data[0].name,
+                    description: data[0].description[0].description
+                  })
+                } else {
+                  setPlaceModalStatus(true)
+                }
+
+              })
+          }*/
+        },
+
+      }
+
+    },
+
+    draw: {
+
+      actions: {
+
+        add: (e, draw) => {
+          //console.log('draw.add', e, draw)
+          let summary = {
+            action: e.action,
+            id: e.features[0].id,
+            type: e.features[0].geometry.type,
+            data: e.features[0]
+          }
+          console.log('draw.add', summary)
+        },
+
+        create: (e, draw) => {
+          //console.log('draw.create', e, draw)
+          let summary = {
+            action: e.action,
+            id: e.features[0].id,
+            type: e.features[0].geometry.type,
+            data: e.features[0]
+          }
+          console.log('draw.create', summary)
+        },
+
+        selected: (e, draw) => {
+          //console.log('draw.selected', e, draw)
+          let summary = {
+            action: e.action,
+            id: e.features[0].id,
+            type: e.features[0].geometry.type,
+            data: e.features[0]
+          }
+          console.log('draw.selected', summary)
+        },
+
+        update: (e, draw) => {
+          //console.log('draw.update', e, draw)
+          let summary = {
+            action: e.action,
+            id: e.features[0].id,
+            type: e.features[0].geometry.type,
+            data: e.features[0]
+          }
+          console.log('draw.update', summary)
+        },
+
+        delete: (e, draw) => {
+          let summary = {
+            action: e.action,
+            id: e.features[0].id,
+            type: e.features[0].geometry.type,
+            data: e.features[0]
+          }
+          console.log('draw.delete', summary)
+        },
+
+      },
+
+      reset: () => {
+        removeStorage('currentRoute')
+        mapObj.routes.route.clean()
+        Draw.deleteAll()
+        Draw.trash()
+      },
+
+      selected: (response) => {
+        mapObj.draw.reset()
+        let selected = defSelected
+        Draw.add(response.map_data.data)
+        selected.features.push(response.map_data.data)
+        if (response.places !== undefined) {
+          for (let place of response.places) {
+            let data = place.map_data.data
+            Draw.add(data)
+            selected.features.push(data)
+          }
+        }
+        if (response.polygons !== undefined) {
+          for (let polygon of response.polygons) {
+            let data = polygon.map_data.data
+            Draw.add(data)
+            selected.features.push(data)
+          }
+        }
+      },
+
+      create: (mapElement) => {
+        let route = parseInt(getStorage('routeId', 'string'))
+        let type = mapElement.features[0].geometry.type
+        if (type === 'Polygon') {
+          postData(polygonsOrigin, {
+            'name': 'Polygon route ' + mapElement.features[0].id,
+            'creator': user_id,
+            'parent_route': route,
+            'element': mapElement.features[0].id,
+            'map_data': mapObj.map.setMapData(mapElement.features[0])
+          })
+            .then(result => {
+              if (result.statusCode === 400) {
+                if (testing) console.log('Something was wrong creating a Polygon')
+              } else {
+                if (testing) console.log('The Polygon ' + mapElement.features[0].id + ' with the id ' + result.id + ' to the route ' + route + ' was succesfully created!!')
+              }
+            })
+        } else if (type === 'Point') {
+          // XXX: Call to a Places modal...
+          mapObj.resetPlace(true);
+          setStorage('tmpPoint', mapElement.features[0], 'json')
+        }
+      },
+
+      launchOption: (type) => jQuery('.mapbox-gl-draw_' + type).click(),
+
+      onUpdate: (mapElement) => {
+        switch (mode) {
+          case 'view': {
+            //mapObj.onCreate(mapElement)
+          } break
+          case 'creation': {
+            mapObj.draw.onCreate(mapElement)
+          } break
+          case 'edition': {
+            mapObj.draw.onEdition(mapElement)
+          } break
+        }
+      },
+
+      onCreate: (mapElement) => {
+
+        if (routeId === 0) {
+
+          if (testing) console.log('Creation mode map action!')
+
+          if (mapObj.showCreationAdvisory()) {
+
+            if (mapElement.type === 'draw.create') {
+
+              let name = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route'
+              //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
+              let description = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
+              let isLineString = mapElement.features[0].geometry.type === 'LineString'
+              let type = mapElement.features[0].geometry.type
+
+              postData(routesOrigin, {
+                'name': name,
+                'creator': user_id,
+                'element': mapElement.features[0].id,
+                'description': [{
+                  'language': 1,
+                  'label': name,//label,
+                  'description': description
+                }],
+                'map_data': mapObj.map.setMapData(isLineString ? mapElement.features[0] : '')
+              })
+                .then(res => {
+
+                  if (res.statusCode === 400) {
+                    if (testing) console.log('Something was wrong with onUpdate creation mode action...')
+                  } else {
+
+                    if (testing) console.log('You have created the element id ' + res.map_data.data.id + ' as route with the id ' + res.id)
+
+                    setMode('edition')
+                    storeChangeAdvisory(true)
+
+                    if (isLineString) {
+
+                      // Setting main inputs ;)
+                      if (testing) console.log('The element is a LineString')
+                      setRouteId(res.id)
+                      setRouteName(name)
+                      setRouteDescription(description)
+                      //setPublishButtonStatus(!true)
+
+                      setRoute(res.map_data.data)
+                      mapObj.setAlert('You have created the new route  \n ' + routeName, 'GRETTINGS!', contentGrettings(res.id))
+
+                    } else {
+
+                      if (type === 'Point') {
+                        if (testing) console.log('The element is a Point')
+                        //XXX: The point requires a modal to save the textual data
+                        mapObj.resetPlace(true);
+                        setStorage('tmpPoint', mapElement.features[0], 'json')
+                      } else if (type === 'Polygon') {
+                        if (testing) console.log('The element is a Polygon')
+                        mapObj.postPolygon(mapElement.features[0], newId)
+                      }
+
+                    }
+
+                    mapObj.setPublishable()
+
+                  }
+
+                })
+
+            }
+
+          } else {
+            if (testing) console.log('Burp...')
+          }
+
+        }
+
+      },
+
+      onEdition: (mapElement) => {
+        if (routeId !== 0) {
+          if (testing) console.log('Edition route mode ' + routeId + ' action!')
+          if (mapObj.showChangeAdvisory()) {
+            if (mapElement.action !== undefined) {
+              if (mapElement.action === 'change_coordinates' || mapElement.action === 'move') {
+                others.updateRouteElement(mapElement)
+              } else {
+                if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+              }
+            } else {
+              if (mapElement.features[0].geometry.type === 'LineString') {
+                let storedLinesAmount = mapObj.checkFeaturesAmount(route, 'LineString')
+                if (storedLinesAmount > 1) {
+                  mapObj.setAlert('You cannot add more than one route. Delete one!')
+                  return false
+                }
+              }
+              switch (mapElement.type) {
+                case 'draw.create':
+                  mapObj.map.createMapElement(mapElement)
+                  break
+                case 'draw.update':
+                  mapObj.map.updateRouteElement(mapElement)
+                  break
+                case 'draw.delete':
+                  mapObj.map.onDelete(mapElement)
+                  break
+                default:
+                  if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+                  break
+              }
+            }
+          }
+        }
+      },
+
+      controls: {
+
+        create: '.mapbox-gl-draw_line',
+
+        edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon,.mapbox-gl-draw_trash',
+
+        creation: () => {
+          jQuery(mapObj.draw.controls.edit).fadeOut()
+          jQuery(mapObj.draw.controls.create).fadeIn()
+        },
+
+        edition: () => {
+          jQuery(mapObj.draw.controls.create).fadeOut()
+          jQuery(mapObj.draw.controls.edit).fadeIn()
+        },
+
+        view: () => {
+          jQuery(mapObj.draw.controls.edit).fadeOut()
+          jQuery(mapObj.draw.controls.create).fadeIn()
+        }
+
       },
 
     },
@@ -431,7 +816,9 @@ const HomePage = () => {
               coords[1],
               place.map_marker,
               place.name,
-              settedAction)
+              settedAction,
+              place.element,
+              null)
           }
         } catch (e) {
           console.log('error 179', e)
@@ -439,27 +826,32 @@ const HomePage = () => {
         }
       },
 
-      setMarker: (placeId, map, lat, lng, icon, popContent, href = '') => {
+      setMarker: (placeId, map, lat, lng, icon, popContent = '<h1>Hello World!</h1>', href = '', element, clickEvent) => {
         try {
-          // @ts-ignore: Object is possibly 'null'.
-          //if (map.getSource('route' + route.id.toString())) return
-          let el = document.createElement('div')
-          let width = 33
-          let height = 43
           getStorage('marker_' + icon)
             .then(icon => {
+
+              let height = 43
+              let width = 33
+              let el = document.createElement('div')
               el.style.backgroundImage = 'url("' + host + '/' + icon.icon.url + '")'
               el.id = 'marker_' + placeId
-              el.className = 'mapElement icon'
+              el.className = 'mapElement icon ' + element
               el.style.width = `${width}px`
               el.style.height = `${height}px`
-              //el.style.textShadow = '90px 2px'
               el.style.backgroundSize = '100%'
-              //let pop = new mapboxgl.Popup({ offset: 25 }).setText(popContent)
-              el.addEventListener('click', () => {
-                //mapObj.route.setPlaceModal(placeId.toString())
-              })
-              new MapboxGL.Marker(el).setLngLat([lng, lat]).addTo(map.current)//.setPopup(pop)
+              if (clickEvent) el.addEventListener('click', () => { clickEvent() })
+              if (popContent) {
+                let pop = new MapboxGL.Popup({ closeOnClick: true })
+                  .setLngLat([lng, lat])
+                  .setHTML(popContent)
+                  .addTo(map.current)
+                new MapboxGL.Marker(el).setLngLat([lng, lat]).addTo(map.current).setPopup(pop)
+                jQuery('.mapboxgl-popup-close-button').click()
+              } else {
+                new MapboxGL.Marker(el).setLngLat([lng, lat]).addTo(map.current)
+              }
+
             })
             .catch(e => {
               console.log('error 659', e)
@@ -475,6 +867,24 @@ const HomePage = () => {
         create: () => { },
 
         update: () => { },
+
+        updateExtra: () => {
+          if (!mapObj.routeUnselected()) {
+            setIsLoading(true)
+            if (routeName !== '' && routeDescription !== '') {//&& routeLabel !== ''
+              putData(routesOrigin + '/' + routeId, {
+                'name': routeName,
+                'description': [{
+                  'language': 1,
+                  'label': routeName,
+                  'description': routeDescription
+                }]
+              })
+                .then()
+            }
+            setIsLoading(false)
+          }
+        },
 
         delete: () => {
           if (window.confirm('ALERT:\nIf you delete the route this will delete on cascade all the related content.\n\nDo you want continue??')) {
@@ -622,6 +1032,33 @@ const HomePage = () => {
 
         },
 
+        render: {
+
+          routeForm: () => <div>
+            <div className='row'>
+              <Label htmlFor='route-name'>Edit name</Label>
+              <InputText
+                type='text'
+                name='route-name'
+                value={routeName}
+                placeholder='Set the route name...'
+                required={true}
+                onChange={({ target: { value } }) => { mapObj.setRouteName(value) }}
+              />
+              <Button
+                label={'Save'}
+                type='submit'
+                onClick={savePlace}
+              />
+            </div>
+            <div className='row'>
+              <span style={{ opacity: routeName ? 0 : 1 }}>Please, set a route name...</span>
+            </div>
+          </div>
+          ,
+
+        }
+
       },
 
       place: {
@@ -644,6 +1081,72 @@ const HomePage = () => {
           }
         },
 
+        editModal: () => {
+          return (
+            <Modal
+              isOpen={false}
+              style={placesModalStyle}
+              contentLabel='Save your place'
+            >
+              <div className='table'>
+                <div className='row'>
+                  <Label htmlFor='place-name'><h2>Set the place data</h2></Label>
+                </div>
+                <div className='row'>
+                  <Label htmlFor='place-name'>Edit Place Name</Label>
+                  <InputText
+                    type='text'
+                    name='place-name'
+                    className='my-input'
+                    value={placeName}
+                    placeholder='Set here the Place Name for this route...'
+                    required={true}
+                    style={{ width: '171%' }}
+                    onChange={({ target: { value } }) => { mapObj.storePlaceName(value) }}
+                  />
+                </div>
+                <div className='row'>
+                  <span style={{ color: placeName ? 'white' : 'red' }}>Please, set a place name...</span>
+                </div>
+                <div className='row'>
+                  <Label htmlFor='place-description'>Description</Label>
+                  <Textarea
+                    name='route-description'
+                    className={'description'}
+                    placeholder='Set here the description for this place...'
+                    required={true}
+                    style={{ maxHeight: '261px', height: '261px' }}
+                    onChange={({ target: { value } }) => { storePlaceDescription(value) }}
+                    value={placeDescription}
+                  />
+                </div>
+                <div className='row'>
+                  <span style={{ color: placeDescription ? 'white' : 'red' }}>Please, set a place label...</span>
+                </div>
+                <div className='row'>
+                  <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
+                  <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <Button
+                      label={'Save'}
+                      type='submit'
+                      onClick={mapObj.savePlace}
+                      className='my-button'
+                    />
+                  </div>
+                  <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <Button
+                      label={'Cancel'}
+                      color={'delete'}
+                      onClick={mapObj.place.cancel}
+                      className='my-button'
+                    />
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          )
+        },
+
         savePlace: (event) => {
           event.preventDefault()
           let mapElement = getStorage('tmpPoint', 'json')
@@ -651,7 +1154,7 @@ const HomePage = () => {
             if (placeName === '' && placeDescription === '') {//&& placeLabel === '' 
               return false
             } else {
-              mapObj.postPlace(mapElement)
+              mapObj.routes.place.postPlace(mapElement)
             }
           } else {
             setAlert('Theres is not data to save about the place');
@@ -670,212 +1173,35 @@ const HomePage = () => {
           }
         },
 
-        onClick: (e, selected) => {
-          if (selected && selected.features.length > 0) {
 
-            getData(placesOrigin + '?element=' + selected.features[0].id)
-              .then(data => {
-                if (data.length === 0) {
-                  console.log('Element not existing!!:', selected.features[0].id)
-                } else {
-                  console.log('Element existing!!:', selected.features[0].id)
-                }
 
-                //mapObj.resetPlace(false)
-                //mapObj.storePlaceId(data[0].element)
-                //mapObj.storePlaceName(data[0].name)
-                //mapObj.storePlaceDescription(data[0].description[0].description)
-                //setPlaceModalStatus(true)            
-              })
-          }
-        },
-
-      },
-
-    },
-
-    draw: {
-
-      reset: () => {
-        removeStorage('currentRoute')
-        mapObj.routes.route.clean()
-        Draw.deleteAll()
-        Draw.trash()
-      },
-
-      controls: {
-        create: '.mapbox-gl-draw_line',
-        edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon,.mapbox-gl-draw_trash',
-        creation: () => {
-          jQuery(mapObj.draw.controls.edit).fadeOut()
-          jQuery(mapObj.draw.controls.create).fadeIn()
-        },
-        edition: () => {
-          jQuery(mapObj.draw.controls.create).fadeOut()
-          jQuery(mapObj.draw.controls.edit).fadeIn()
-        },
-        view: () => {
-          jQuery(mapObj.draw.controls.edit).fadeOut()
-          jQuery(mapObj.draw.controls.create).fadeOut()
-        }
-      },
-
-      selected: (response) => {
-        mapObj.draw.reset()
-        let selected = defSelected
-        Draw.add(response.map_data.data)
-        selected.features.push(response.map_data.data)
-        if (response.places !== undefined) {
-          for (let place of response.places) {
-            let data = place.map_data.data
-            Draw.add(data)
-            selected.features.push(data)
-          }
-        }
-        if (response.polygons !== undefined) {
-          for (let polygon of response.polygons) {
-            let data = polygon.map_data.data
-            Draw.add(data)
-            selected.features.push(data)
-          }
-        }
-      },
-
-      launchOption: (type) => jQuery('.mapbox-gl-draw_' + type).click(),
-
-      onUpdate: (mapElement) => {
-        switch (mode) {
-          case 'view': {
-            //mapObj.onCreate(mapElement)
-          } break
-          case 'creation': {
-            mapObj.draw.onCreate(mapElement)
-          } break
-          case 'edition': {
-            mapObj.draw.onEdition(mapElement)
-          } break
-        }
-      },
-
-      onCreate: (mapElement) => {
-
-        if (routeId === 0) {
-
-          if (testing) console.log('Creation mode map action!')
-
-          if (mapObj.showCreationAdvisory()) {
-
-            if (mapElement.type === 'draw.create') {
-
-              let name = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route'
-              //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
-              let description = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
-              let isLineString = mapElement.features[0].geometry.type === 'LineString'
-              let type = mapElement.features[0].geometry.type
-
-              postData(routesOrigin, {
-                'name': name,
-                'creator': user_id,
-                'element': mapElement.features[0].id,
-                'description': [{
-                  'language': 1,
-                  'label': name,//label,
-                  'description': description
-                }],
-                'map_data': mapObj.setMapData(isLineString ? mapElement.features[0] : '')
-              })
-                .then(res => {
-
-                  if (res.statusCode === 400) {
-                    if (testing) console.log('Something was wrong with onUpdate creation mode action...')
-                  } else {
-
-                    if (testing) console.log('You have created the element id ' + res.map_data.data.id + ' as route with the id ' + res.id)
-
-                    setMode('edition')
-                    storeChangeAdvisory(true)
-
-                    if (isLineString) {
-
-                      // Setting main inputs ;)
-                      if (testing) console.log('The element is a LineString')
-                      setRouteId(res.id)
-                      setRouteName(name)
-                      setRouteDescription(description)
-                      //setPublishButtonStatus(!true)
-
-                      setRoute(res.map_data.data)
-                      mapObj.setAlert('You have created the new route  \n ' + routeName, 'GRETTINGS!', contentGrettings(res.id))
-
-                    } else {
-
-                      if (type === 'Point') {
-                        if (testing) console.log('The element is a Point')
-                        //XXX: The point requires a modal to save the textual data
-                        mapObj.resetPlace(true);
-                        setStorage('tmpPoint', mapElement.features[0], 'json')
-                      } else if (type === 'Polygon') {
-                        if (testing) console.log('The element is a Polygon')
-                        mapObj.postPolygon(mapElement.features[0], newId)
-                      }
-
-                    }
-
-                    mapObj.setPublishable()
-
-                  }
-
-                })
-
-            }
-
-          } else {
-            if (testing) console.log('Burp...')
-          }
-
-        }
-
-      },
-
-      onEdition: (mapElement) => {
-        if (routeId !== 0) {
-          if (testing) console.log('Edition route mode ' + routeId + ' action!')
-          if (mapObj.showChangeAdvisory()) {
-            if (mapElement.action !== undefined) {
-              if (mapElement.action === 'change_coordinates' || mapElement.action === 'move') {
-                others.updateRouteElement(mapElement)
+        postPlace: (placeFeatures) => {
+          if (!placeFeatures) return false
+          postData(placesOrigin, {
+            'name': placeName,
+            'creator': user_id,
+            'parent_route': routeId,
+            'element': placeFeatures.id,
+            'description': [{
+              'language': 1,
+              'label': placeName,// 'New route label',
+              'description': placeDescription
+            }],
+            'map_data': mapObj.map.setMapData(placeFeatures)
+          })
+            .then(data => {
+              if (data.statusCode === 400) {
+                if (testing) console.log('Something was wrong with creating a Place...')
               } else {
-                if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+                if (testing) console.log('Place ' + placeFeatures.id + ' posted successful ;)')
+                mapObj.resetPlace(false)
               }
-            } else {
-              if (mapElement.features[0].geometry.type === 'LineString') {
-                let storedLinesAmount = mapObj.checkFeaturesAmount(route, 'LineString')
-                if (storedLinesAmount > 1) {
-                  mapObj.setAlert('You cannot add more than one route. Delete one!')
-                  return false
-                }
-              }
-              switch (mapElement.type) {
-                case 'draw.create':
-                  mapObj.map.createMapElement(mapElement)
-                  break
-                case 'draw.update':
-                  mapObj.map.updateRouteElement(mapElement)
-                  break
-                case 'draw.delete':
-                  mapObj.map.onDelete(mapElement)
-                  break
-                default:
-                  if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
-                  break
-              }
-            }
-          }
-        }
+            })
+        },
+
       },
 
     },
-
 
     modes: {
 
@@ -885,7 +1211,7 @@ const HomePage = () => {
         mapObj.draw.controls.view()
 
         setRouteId(0)
-        if(routeId!== undefined) mapObj.draw.reset()        
+        if (routeId !== undefined) mapObj.draw.reset()
         mapObj.map.flyTo(center)
       },
 
@@ -906,7 +1232,7 @@ const HomePage = () => {
         mapObj.editor.edition(route)
 
         mapObj.draw.selected(route)
-        //mapObj.routes.setMarkers(route)
+        mapObj.routes.setMarkers(route)// PAINTING COMMON POINTERS!!
 
         let routeCenter = { lat: route.map_data.center_lat, lng: route.map_data.center_long, zoom: route.map_data.center_zoom }
         mapObj.map.flyTo(routeCenter)
@@ -999,7 +1325,7 @@ const HomePage = () => {
           onClick: (e) => { mapObj.route.publish() }
         }
 
-      }
+      },
 
     },
 
@@ -1007,102 +1333,8 @@ const HomePage = () => {
 
   const others = {
 
-    renderRouteEditionForm: () => {
-      return (
-        <div>
-          <div className='row'>
-            <Label htmlFor='route-name'>Edit name</Label>
-            <InputText
-              type='text'
-              name='route-name'
-              value={routeName}
-              placeholder='Set the route name...'
-              required={true}
-              onChange={({ target: { value } }) => { mapObj.setRouteName(value) }}
-            />
-            <Button
-              label={'Save'}
-              type='submit'
-              onClick={savePlace}
-            />
-          </div>
-          <div className='row'>
-            <span style={{ opacity: routeName ? 0 : 1 }}>Please, set a route name...</span>
-          </div>
-        </div>
-      )
-    },
-
     contentGrettings: (id) => {
       return (<Link to={'/admin/plugins/content-manager/collectionType/application::routes.routes/' + id} className='btn btn-primary'>Add media</Link>)
-    },
-
-    updateRouteExtra: () => {
-      if (!mapObj.routeUnselected()) {
-        setIsLoading(true)
-        if (routeName !== '' && routeDescription !== '') {//&& routeLabel !== ''
-          putData(routesOrigin + '/' + routeId, {
-            'name': routeName,
-            'description': [{
-              'language': 1,
-              'label': routeName,
-              'description': routeDescription
-            }]
-          })
-            .then()
-        }
-        setIsLoading(false)
-      }
-    },
-
-    createMapElement: (mapElement) => {
-      let route = parseInt(getStorage('routeId', 'string'))
-      let type = mapElement.features[0].geometry.type
-      if (type === 'Polygon') {
-        postData(polygonsOrigin, {
-          'name': 'Polygon route ' + mapElement.features[0].id,
-          'creator': user_id,
-          'parent_route': route,
-          'element': mapElement.features[0].id,
-          'map_data': mapObj.setMapData(mapElement.features[0])
-        })
-          .then(result => {
-            if (result.statusCode === 400) {
-              if (testing) console.log('Something was wrong creating a Polygon')
-            } else {
-              if (testing) console.log('The Polygon ' + mapElement.features[0].id + ' with the id ' + result.id + ' to the route ' + route + ' was succesfully created!!')
-            }
-          })
-      } else if (type === 'Point') {
-        // XXX: Call to a Places modal...
-        mapObj.resetPlace(true);
-        setStorage('tmpPoint', mapElement.features[0], 'json')
-      }
-    },
-
-    setMapData: (features) => {
-
-      console.log(features)
-
-      let focus = getStorage('focus')
-
-      let lat = mapBoxDetails.defCenter.lat
-      let lng = mapBoxDetails.defCenter.lng
-      let zoom = mapBoxDetails.defCenter.zoom
-
-      if (focus) {
-        lat = getStorage('focus').lat
-        lng = getStorage('focus').lng
-        zoom = getStorage('focus').zoom
-      }
-
-      return {
-        'center_lat': lat,
-        'center_long': lng,
-        'center_zoom': zoom,
-        'data': features,
-      }
-
     },
 
     updateRouteElement: (mapElement) => {
@@ -1133,7 +1365,7 @@ const HomePage = () => {
             if (testing) console.log('You got the desired element ' + id)
             let putUrl = url + '/' + response[0].id
 
-            putData(putUrl, { 'map_data': mapObj.setMapData(mapElement.features[0]) })
+            putData(putUrl, { 'map_data': mapObj.map.setMapData(mapElement.features[0]) })
               .then(data => {
                 if (data.statusCode === 400) {
                   if (testing) console.log('Something was wrong with updateRouteElement action...')
@@ -1146,29 +1378,7 @@ const HomePage = () => {
         })
     },
 
-    postPlace: (placeFeatures) => {
-      if (!placeFeatures) return false
-      postData(placesOrigin, {
-        'name': placeName,
-        'creator': user_id,
-        'parent_route': routeId,
-        'element': placeFeatures.id,
-        'description': [{
-          'language': 1,
-          'label': placeName,// 'New route label',
-          'description': placeDescription
-        }],
-        'map_data': mapObj.setMapData(placeFeatures)
-      })
-        .then(data => {
-          if (data.statusCode === 400) {
-            if (testing) console.log('Something was wrong with creating a Place...')
-          } else {
-            if (testing) console.log('Place ' + placeFeatures.id + ' posted successful ;)')
-            mapObj.resetPlace(false)
-          }
-        })
-    },
+
 
     postPolygon: (polygonFeatures, i) => {
       postData(polygonsOrigin, {
@@ -1176,7 +1386,7 @@ const HomePage = () => {
         'creator': user_id,
         'parent_route': routeId,
         'element': polygonFeatures.id,
-        'map_data': mapObj.setMapData(polygonFeatures)
+        'map_data': mapObj.map.setMapData(polygonFeatures)
       })
         .then(data => {
           if (data.statusCode === 400) {
@@ -1188,9 +1398,7 @@ const HomePage = () => {
     },
 
     validatePublishing: () => {
-
       if (testing) console.log('validatePublishing attempt... is route! ;))')
-
       getData(routesOrigin + '/' + routeId)
         .then(result => {
 
@@ -1207,9 +1415,7 @@ const HomePage = () => {
           }
 
         })
-
       return true
-
     },
 
     resetPublishButton: () => {
@@ -1229,10 +1435,6 @@ const HomePage = () => {
       mapObj.storePublishButtonColor('success')
     },
 
-    launchToast: (message, doContinue = false, label) => {
-      setAlert(message, label)
-      return doContinue
-    },
 
     showChangeAdvisory: () => {
       console.log('routeId', routeId)
@@ -1248,6 +1450,11 @@ const HomePage = () => {
       //return true
     },
 
+    launchToast: (message, doContinue = false, label) => {
+      setAlert(message, label)
+      return doContinue
+    },
+
     setAlert: (message, label = '', content = null) => {
       setAlertModalMessage(message)
       setAlertModalLabel(label)
@@ -1259,71 +1466,7 @@ const HomePage = () => {
       setAlertModalStatus(false)
     },
 
-    editPlaceModal: () => {
-      return (
-        <Modal
-          isOpen={false}
-          style={placesModalStyle}
-          contentLabel='Save your place'
-        >
-          <div className='table'>
-            <div className='row'>
-              <Label htmlFor='place-name'><h2>Set the place data</h2></Label>
-            </div>
-            <div className='row'>
-              <Label htmlFor='place-name'>Edit Place Name</Label>
-              <InputText
-                type='text'
-                name='place-name'
-                className='my-input'
-                value={placeName}
-                placeholder='Set here the Place Name for this route...'
-                required={true}
-                style={{ width: '171%' }}
-                onChange={({ target: { value } }) => { mapObj.storePlaceName(value) }}
-              />
-            </div>
-            <div className='row'>
-              <span style={{ color: placeName ? 'white' : 'red' }}>Please, set a place name...</span>
-            </div>
-            <div className='row'>
-              <Label htmlFor='place-description'>Description</Label>
-              <Textarea
-                name='route-description'
-                className={'description'}
-                placeholder='Set here the description for this place...'
-                required={true}
-                style={{ maxHeight: '261px', height: '261px' }}
-                onChange={({ target: { value } }) => { storePlaceDescription(value) }}
-                value={placeDescription}
-              />
-            </div>
-            <div className='row'>
-              <span style={{ color: placeDescription ? 'white' : 'red' }}>Please, set a place label...</span>
-            </div>
-            <div className='row'>
-              <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
-              <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-                <Button
-                  label={'Save'}
-                  type='submit'
-                  onClick={mapObj.savePlace}
-                  className='my-button'
-                />
-              </div>
-              <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-                <Button
-                  label={'Cancel'}
-                  color={'delete'}
-                  onClick={mapObj.place.cancel}
-                  className='my-button'
-                />
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )
-    },
+
 
     alertModal: () => {
       return (
@@ -1362,6 +1505,7 @@ const HomePage = () => {
         </div>
       )
     },
+
   }
 
   useEffect(mapObj.init, [])

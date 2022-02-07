@@ -191,15 +191,42 @@ export const getData = async (url = '') => {
 
 }
 
+export const getRoutesList = (routes) => {
+    let options = [{ value: '0', label: messages.chooseRoute }]
+    if (routes) {
+        for (let route of routes) {
+            options.push({ value: route.id.toString(), label: route.name })
+        }
+    }
+    return options
+}
 
-
-
-
-
-
-
-
-
+export const getCenter = (routes, zoom = 9) => {
+    let lat = 0, lng = 0, i = 0
+    for (let route of routes) {
+        let coordinates = route.map_data.data.geometry.coordinates
+        for (let coordinate of coordinates) {
+            lat = lat + parseFloat(coordinate[1])
+            lng = lng + parseFloat(coordinate[0])
+            ++i
+        }
+    }
+    let res = { lat: lat / i, lng: lng / i }
+    lat = 0
+    lng = 0
+    i = 0
+    for (let route of routes) {
+        let places = route.places
+        for (let place of places) {
+            lat = lat + parseFloat(place.map_data.center_lat)
+            lng = lng + parseFloat(place.map_data.center_long)
+            ++i
+        }
+    }
+    let res2 = { lat: lat / i, lng: lng / i }
+    let return_ = { lat: (res.lat + res2.lat) / 2 + 0.15, lng: (res.lng + res2.lng) / 2 + 0.6, zoom: zoom }
+    return return_
+}
 
 
 export const Draw = new MapboxGLDraw({
@@ -212,7 +239,9 @@ export const Draw = new MapboxGLDraw({
         marker: true,
         trash: true
     },
+    /*
     styles: [
+
         // ACTIVE (being drawn)
         // line stroke
         {
@@ -287,7 +316,7 @@ export const Draw = new MapboxGLDraw({
                 "circle-radius": 4,
                 "circle-color": "#4264fb",
             }
-        },        
+        },
 
         // INACTIVE (static, already drawn)
         // line stroke
@@ -329,5 +358,7 @@ export const Draw = new MapboxGLDraw({
                 "line-width": 3
             }
         }
+
     ]
+    */
 })

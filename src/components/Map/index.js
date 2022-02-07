@@ -1,51 +1,25 @@
 /* eslint-disable */
-import React, { useRef, useState, useEffect, memo, useCallback, useMemo, Link } from 'react';
-
-import { Select, Button, InputText, Textarea, Label } from '@buffetjs/core'
-import { Header } from '@buffetjs/custom'
-
-import QRCode from 'qrcode.react'
-import Modal from 'react-modal'
-import Slider from 'react-slick';
+import React, { useRef, useState, useEffect, memo } from 'react';
 
 import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import 'react-tabs/style/react-tabs.css'
-import MapboxGL, { Map, FullscreenControl, GeolocateControl, accessToken } from 'mapbox-gl'
+import MapboxGL, { Map, FullscreenControl, GeolocateControl } from 'mapbox-gl'
 import jQuery from 'jquery'
-
-import routeIcon from './routeIcon.png'
-import placeIcon from './placeIcon.png'
-import polygonIcon from './polygonIcon.png'
-import dropIcon from './dropIcon.png'
-
-// BuffetJS
-import { LoadingBar } from '@buffetjs/styles'
-
-// Fontawsome...
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus } from '@fortawesome/free-solid-svg-icons'
-
-import { setStorage, getStorage, getRouteType, alertModalStyle, getData, Draw, placesModalStyle, putData, deleteData, messages, removeStorage, checkFeaturesAmount, postData, makeId } from './map-utils.js';
-import { Toast } from 'bootstrap'
-
-
+import { setStorage, removeStorage, getStorage, getData, Draw, deleteData, getCenter } from '../../map-utils.js';
 
 import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'react-responsive-carousel/lib/styles/carousel.min.css' // requires a loader
-import { Carousel } from 'react-responsive-carousel'
-import './index.css'
 
 MapboxGL.accessToken = 'pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg'
+
 const MapboxLanguage = require('@mapbox/mapbox-gl-language')
 
 const testing = true
 
 const host = 'https://cms.hoponboard.eu'
-
-const defSelected = { type: 'FeatureCollection', features: [] }
 
 const mapBoxDetails = {
 
@@ -79,7 +53,7 @@ const mapBoxDetails = {
 
 }
 
-const HomePage = () => {
+const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => {
 
   // MAIN
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
@@ -91,212 +65,115 @@ const HomePage = () => {
   // REFERENCES
   const maparea = useRef(null)
 
-  // MAP VIEWPORT STATE
-  const [isLoading, setIsLoading] = useState(false)
-
-  // ROUTES
-  const [route, setRoute] = useState() // The selected route content
-  const [routeId, setRouteId] = useState()
-  const [place, setPlace] = useState()
-  const [routes, setRoutes] = useState([]) // The loaded routes content related with this client...  
-  const [center, setCenter] = useState() // Is the calculated center, related with the routes created
-  const [qrUrl, setQrUrl] = useState(null) // QRCode for access this client ;)
-
-  // New Place data
-  const [alertModalStatus, setAlertModalStatus] = useState(false)
-  const [alertModalMessage, setAlertModalMessage] = useState('')
-  const [alertModalLabel, setAlertModalLabel] = useState('')
-  const [alertContent, setAlertContent] = useState(null)  
-  const [placeId, setPlaceId] = useState(0)
-  const [placeName, setPlaceName] = useState('')
-  const [placeLabel, setPlaceLabel] = useState('')
-  const [placeDescription, setPlaceDescription] = useState('')
-  const [placeModalStatus, setPlaceModalStatus] = useState(false)
-
-  const [routeMarkers, setRouteMarkers] = useState([])
-
-  // EDITOR
-  const [mode, setMode] = useState()
   const [focus, setFocus] = useState(mapBoxDetails.defCenter)
 
-  const [markers, setMarkers] = useState(null)
-  
-  // Buttons
-  const [button1, setButton1] = useState({ visible: false })
-  const [button2, setButton2] = useState({ visible: false })
-  const [instructions, setInstructions] = useState()
-  //const [button3, setButton3] = useState()
-    
+  useEffect(()=>{states.init()}, [])
+  //useEffect(() => { states.routeId(routeId) }, [routeId])
+  useEffect(() => { states.route(route) }, [route])
+  useEffect(() => { states.center(center) }, [center])
+  useEffect(() => { console.log(routes) }, [routes])
 
-  // OTHERS
+  const states = {
 
-  if (typeof (window) !== 'undefined') { Modal.setAppElement('body') }
+    init: ()=>{
+      map.init()
+    },
 
-  let init = () => {
+    routeId: (routeId)=>{
+      myRoutes.switch(routeId)
+    },
 
-    // Get required data
-    instr.init()
-    map.getApiMarkers()
+    route: (route)=>{
 
-    // Init map and routes panel
-    map.init()
-    myRoutes.init()
+      console.log('drawer reset¡¡¡', route)
 
-    // Set view mode
-    modes.view()
+      if (route) {
+        myRoutes.load(route)
+      } else {
 
-    if (!user_id) history.go(0)
-    localStorage.setItem('user_id', user_id)
+        drawer.reset()
+      }
+    },
 
-  }
+    routes:(routes)=>{
+      myRoutes.load(routes)
+    },
 
-  let instr = {
-
-    init: async () => fetch(host + '/instructions').then((res) => res.json()).then(setInstructions),
-
-    render: () =>
-      <div className='advisory-box'>
-        <ul>
-          {instructions && instructions.map((instr, index) => {
-            return <li key={'route-' + index} style={{ cursor: 'pointer' }} onClick={() => drawer.launchOption(instr.action_class)} >
-              <Label htmlFor='' style={{ cursor: 'pointer' }} className={'advisory'} >
-                <img src={host + instr.icon.url} style={{ cursor: 'pointer' }} alt='' />
-                <span>
-                  {instr.translations[0].label}
-                </span>
-                {/*<div className="img-wrapper" onClick={()=>{ console.log('.'+instr.action_class)}}>
-                    <svg viewport=" 0 0 7 5" width="7" height="5" xmlns="http://www.w3.org/2000/svg"><path d="M0 .469c0 .127.043.237.13.33l3.062 3.28a.407.407 0 0 0 .616 0L6.87.8A.467.467 0 0 0 7 .468a.467.467 0 0 0-.13-.33A.407.407 0 0 0 6.563 0H.438A.407.407 0 0 0 .13.14.467.467 0 0 0 0 .468z" fill-rule="nonzero" fill="#333740"></path></svg>
-                  </div>*/}
-              </Label>
-              <div style={{ display: 'none' }} className={instr.action_class}>{instr.translations[0].description}</div>
-            </li>
-          })}
-        </ul>
-      </div>,
-
-  }
-
-  let render = {
-
-    // Render left panel
-    leftPan: () =>
-      <div>
-        <div ref={maparea} className='map-container' />
-        <div className='nav-bar'>
-          Lat: {focus.lat.toFixed(2)} • Lng: {focus.lng.toFixed(2)} • Zoom: {Math.round(focus.zoom)}
-        </div>
-      </div>,
-
-    // Render right panel
-    rightPan: () =>
-      <div>
-        <div className='row'>
-          <div className='col-6' style={{ textAlign: 'center' }}><Button {...button1} /></div>
-          <div className='col-6' style={{ textAlign: 'center' }}><Button {...button2} /></div>
-        </div>
-
-        <div className='row'>
-          <div className='col-sm-12 col-md-12 col-lg-12'>
-            {render.routesSelector(routes)}
-            {render.instructions()}
-            <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
-          </div>
-        </div>
-
-        <div className='row'>
-          <div className='col-sm-12 col-md-12 col-lg-12' style={{ textAlign: 'center' }}>
-            {qrUrl && <QRCode value={qrUrl} />}
-            <br /><br /><br /><br />
-            <div className='nav-bar'>
-              • Mode: {mode} • Route: {routeId}
-            </div>
-          </div>
-        </div>
-
-        {/* 
-             <div className='col-12'>
-                <div className='row route-creator'>
-                  <Label htmlFor='route-description'>Description</Label>
-                  <Textarea
-                    name='route-description'
-                    value={routeDescription}
-                    className={'description'}
-                    placeholder='Set a description...'
-                    required={true}
-                    style={{ height: '450px', maxHeight: '450px', minHeight: '450px' }}
-                    onChange={({ target: { value } }) => { setRouteDescription(value) }}
-                  />
-                  <span style={{ color: routeDescription ? 'white' : 'red' }}>Please, set a route description...</span>
-                </div>
-              </div>
-            </div>
-            {myRoutes.place.editModal()}
-            {alertModal()}
-          */}
-
-      </div>,
-
-    routesSelector: (routes) =>
-      <div>
-        {routes && <div>
-          {/*<Label htmlFor='' className={'head-advisory'}>{username}, edit your routes!</Label>*/}
-          <Select
-            name='selected-route'
-            className='primary'
-            value={routeId}
-            options={routes}
-            closeMenuOnSelect={true}
-            style={{ width: '97%' }}
-            onChange={({ target: { value } }) => { setRouteId(value) }}>
-          </Select>
-        </div>
-        }
-      </div>,
-
-    initInstructions: async () => fetch(host + '/instructions').then((res) => res.json()).then(setInstructions),
-
-    instructions: () =>
-      <div className='advisory-box'>
-        <ul>
-          {instructions && instructions.map((instr, index) => {
-            return <li key={'route-' + index} style={{ cursor: 'pointer' }} onClick={() => drawer.launchOption(instr.action_class)} >
-              <Label htmlFor='' style={{ cursor: 'pointer' }} className={'advisory'} >
-                <img src={host + instr.icon.url} style={{ cursor: 'pointer' }} alt='' />
-                <span>
-                  {instr.translations[0].label}
-                </span>
-                {/*<div className="img-wrapper" onClick={()=>{ console.log('.'+instr.action_class)}}>
-                    <svg viewport=" 0 0 7 5" width="7" height="5" xmlns="http://www.w3.org/2000/svg"><path d="M0 .469c0 .127.043.237.13.33l3.062 3.28a.407.407 0 0 0 .616 0L6.87.8A.467.467 0 0 0 7 .468a.467.467 0 0 0-.13-.33A.407.407 0 0 0 6.563 0H.438A.407.407 0 0 0 .13.14.467.467 0 0 0 0 .468z" fill-rule="nonzero" fill="#333740"></path></svg>
-                  </div>*/}
-              </Label>
-              <div style={{ display: 'none' }} className={instr.action_class}>{instr.translations[0].description}</div>
-            </li>
-          })}
-        </ul>
-      </div>,
+    center: (center)=>{
+      map.flyTo(center) 
+    }
 
   }
 
   let map = {
 
     init: async () => {
-      await getStorage('center').then(center => {
-        let centerNow = center ? center : mapBoxDetails.defCenter
-        if (!maparea) return
-        let mapInit = {
-          center: [centerNow.lng, centerNow.lat],
-          container: maparea.current || '',
-          containerStyle: mapBoxDetails.style,
-          style: mapBoxDetails.tile,
-          zoom: centerNow.zoom,
-          minZoom: 4,
-          maxZoom: 18
-        }
-        maparea.current = new Map(mapInit)
-        maparea.current.on('load', map.onLoad())
-      })
+      let centerNow = center ? center : mapBoxDetails.defCenter
+      if (!maparea) return
+      let mapInit = {
+        center: [centerNow.lng, centerNow.lat],
+        container: maparea.current || '',
+        containerStyle: mapBoxDetails.style,
+        style: mapBoxDetails.tile,
+        zoom: centerNow.zoom,
+        minZoom: 4,
+        maxZoom: 18
+      }
+      maparea.current = new Map(mapInit)
+      maparea.current.on('load', map.onLoad())
     },
 
+    onLoad: () => {
+      map.setDraw(true)
+      map.addControls()
+      maparea.current.resize()
+    },
+
+    addControls: () => {
+      maparea.current
+        .addControl(Draw, 'top-left')
+        .addControl(new MapboxLanguage())
+        .addControl(new FullscreenControl())
+        //.addControl(new GeolocateControl(mapBoxDetails.geolocator))
+        .addControl(new MapboxGLGeocoder(mapBoxDetails.MapboxGLGeocoder))
+    },
+
+    setDraw: (common) => {
+
+      if (common) {
+
+        // COMMON ACTIONS
+        maparea.current.on('move', () => map.actions.move())
+          .on('click', (e) => map.actions.click(e, Draw.getSelected()))
+          .on('mouseenter', 'places', () => {
+            // Change the cursor to a pointer when the mouse is over the places layer.
+            maparea.current.getCanvas().style.cursor = 'pointer'
+          }).on('mouseleave', 'places', () => {
+            // Change it back to a pointer when it leaves.
+            maparea.current.getCanvas().style.cursor = ''
+          })
+
+      } else {
+
+        // DRAW ACTIONS
+        maparea.current.on('draw.select', (e) => draw.select(e, Draw.change()))
+
+        maparea.current.on('draw.add', (e) => draw.add(e, Draw.getAll()))
+        maparea.current.on('draw.create', (e) => draw.create(e, Draw.getAll()))
+        maparea.current.on('draw.update', (e) => draw.update(e, Draw.getAll()))
+        maparea.current.on('draw.delete', (e) => draw.delete(e, Draw.getAll()))
+
+      }
+
+    },
+
+    setRoute: (route) => {
+      console.log('setting:' + route)
+      myRoutes.switch(route)
+    },
+
+    /*
+    
     getApiMarkers: () => {
       fetch(host + '/map-markers')
         .then((markers) => markers.json())
@@ -308,63 +185,6 @@ const HomePage = () => {
           setMarkers(markers)
         })
         .catch(e => { console.error(e) })
-    },
-
-    onLoad: () => {
-      map.setDraw()
-      map.addControls()
-      maparea.current.resize()
-    },
-
-    setDraw: () => {
-
-      // COMMON ACTIONS
-      maparea.current.on('move', () => map.actions.move())
-        .on('click', (e) => map.actions.click(e, Draw.getSelected()))
-        .on('mouseenter', 'places', () => {
-          // Change the cursor to a pointer when the mouse is over the places layer.
-          maparea.current.getCanvas().style.cursor = 'pointer'
-        }).on('mouseleave', 'places', () => {
-          // Change it back to a pointer when it leaves.
-          maparea.current.getCanvas().style.cursor = ''
-        })
-
-      // DRAW ACTIONS
-      maparea.current.on('draw.select', (e) => draw.select(e, Draw.change()))
-      
-      maparea.current.on('draw.add', (e) => draw.add(e, Draw.getAll()))
-      maparea.current.on('draw.create', (e) => draw.create(e, Draw.getAll()))
-      maparea.current.on('draw.update', (e) => draw.update(e, Draw.getAll()))
-      maparea.current.on('draw.delete', (e) => draw.delete(e, Draw.getAll()))
-
-      /*maparea.current.on('click', 'places', (e) => {
-        // Copy coordinates array.
-        const coordinates = e.features[0].geometry.coordinates.slice();
-        const description = e.features[0].properties.description;
-         
-        // Ensure that if the map is zoomed out such that multiple
-        // copies of the feature are visible, the popup appears
-        // over the copy being pointed to.
-        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-        }
-         
-        new mapboxgl.Popup()
-        .setLngLat(coordinates)
-        .setHTML(description)
-        .addTo(map);
-        });
-      */
-
-    },
-
-    addControls: () => {
-      maparea.current
-        .addControl(Draw, 'top-left')
-        .addControl(new MapboxLanguage())
-        .addControl(new FullscreenControl())
-        .addControl(new GeolocateControl(mapBoxDetails.geolocator))
-        .addControl(new MapboxGLGeocoder(mapBoxDetails.MapboxGLGeocoder))
     },
 
     onDelete: (mapElement) => {
@@ -417,31 +237,31 @@ const HomePage = () => {
       })
     },
 
-    setMapData: (features) => {
 
-      let focus = getStorage('focus')
+      click: (e, selected) => {
+        console.log('map.actions.click', e, selected.features)
+        if (selected.features.length > 0) {
+          let summary = {
+            action: 'click',
+            type: selected.features[0].geometry.type,
+            id: selected.features[0].id,
+            data: selected.features[0]
+          }
+          console.log('map.select', summary)
+          setStorage('selectedElement', summary)
+        } else {
+          // Click on the map and unhold selected element from memory!!!
+          setStorage('selectedElement', null)
+        }
 
-      let lat = mapBoxDetails.defCenter.lat
-      let lng = mapBoxDetails.defCenter.lng
-      let zoom = mapBoxDetails.defCenter.zoom
+      },
 
-      if (focus) {
-        lat = getStorage('focus').lat
-        lng = getStorage('focus').lng
-        zoom = getStorage('focus').zoom
-      }
-
-      return {
-        'center_lat': lat,
-        'center_long': lng,
-        'center_zoom': zoom,
-        'data': features,
-      }
-
-    },
+    }
+    */
 
     flyTo: (center) => {
       if (!center) return
+      setCenter(center)
       maparea.current.flyTo({ center: [center.lng, center.lat], zoom: center.zoom })
     },
 
@@ -459,6 +279,9 @@ const HomePage = () => {
       },
 
       click: (e, selected) => {
+
+        console.log('lamode', mode)
+
         console.log('map.actions.click', e, selected.features)
         if (selected.features.length > 0) {
           let summary = {
@@ -492,7 +315,7 @@ const HomePage = () => {
         }*/
       },
 
-    }
+    },
 
   }
 
@@ -565,26 +388,25 @@ const HomePage = () => {
 
     //
     reset: () => {
-      removeStorage('currentRoute')
-      myRoutes.route.clean()
       Draw.deleteAll()
       Draw.trash()
+      myRoutes.route.clean()
     },
 
-    selected: (response) => {
-      drawer.reset()
-      let selected = defSelected
-      Draw.add(response.map_data.data)
-      selected.features.push(response.map_data.data)
-      if (response.places !== undefined) {
-        for (let place of response.places) {
+    selected: (routeData) => {
+
+      let selected = { type: 'FeatureCollection', features: [] }
+      Draw.add(routeData.map_data.data)
+      selected.features.push(routeData.map_data.data)
+      if (routeData.places !== undefined) {
+        for (let place of routeData.places) {
           let data = place.map_data.data
           Draw.add(data)
           selected.features.push(data)
         }
       }
-      if (response.polygons !== undefined) {
-        for (let polygon of response.polygons) {
+      if (routeData.polygons !== undefined) {
+        for (let polygon of routeData.polygons) {
           let data = polygon.map_data.data
           Draw.add(data)
           selected.features.push(data)
@@ -775,6 +597,50 @@ const HomePage = () => {
 
   }
 
+  let modes = {
+
+    view: () => {
+      //setMode('view')
+      //editor.view()
+      //drawer.controls.view()
+
+      //setRouteId(0)
+      //if (routeId !== undefined) drawer.reset()
+      //map.flyTo(center)
+    },
+
+    creation: () => {
+      //setMode('creation')
+      //drawer.controls.creation()
+      //editor.creation()
+      //setRouteId(0)
+      //drawer.reset()
+      //map.flyTo(center)
+    },
+
+    edition: (route) => {
+      drawer.reset()
+      drawer.selected(route)
+      myRoutes.setMarkers(route)// PAINTING COMMON POINTERS!!
+      let routeCenter = { lat: route.map_data.center_lat, lng: route.map_data.center_long, zoom: route.map_data.center_zoom }
+      map.flyTo(routeCenter)
+    },
+
+    showCreationAdvisory: () => {
+      if (routeId === 0) {
+        if (window.confirm('Do you want to create a new route?')) {
+          //storeCreationAdvisory(Date.now())
+          return true
+        } else {
+          Draw.trash()
+          return false
+        }
+      }
+      return true
+    },
+
+  }
+
   let myRoutes = {
 
     init: () => {
@@ -800,11 +666,16 @@ const HomePage = () => {
       setRoutes(options)
     },
 
-    switch: () => {
-      fetch(host + '/routes' + '/' + routeId)
-        .then((res) => res.json())
+    load: (route) => {
+      modes.edition(route)
+    },
+
+    switch: (routeId) => {
+      let get = host + '/routes/' + routeId
+      fetch(get)
+        .then((route) => route.json())
         .then(modes.edition)
-        .catch(modes.view)
+        .catch(error => { console.error(error) })
     },
 
     getCenter: (routes, zoom = 9) => {
@@ -839,7 +710,10 @@ const HomePage = () => {
       try {
         let i = 0
         for (let place of route.places) {
-          let coords = [place.map_data.data.geometry.coordinates[1], place.map_data.data.geometry.coordinates[0]]
+          let coords = [
+            place.map_data.data.geometry.coordinates[1],
+            place.map_data.data.geometry.coordinates[0]
+          ]
           let settedAction = action
             .replace('#route_id#', route.id.toString())
             .replace('#step#', (i++).toString())
@@ -860,9 +734,9 @@ const HomePage = () => {
       }
     },
 
-    setMarker: (placeId, map, lat, lng, icon, popContent = '<h1>Hello World!</h1>', href = '', element, clickEvent) => {
+    setMarker: (placeId, map, lat, lng, iconId, popContent = '<h1>Hello World!</h1>', href = '', element, clickEvent) => {
       try {
-        getStorage('marker_' + icon)
+        getStorage('marker_' + iconId)
           .then(icon => {
 
             let height = 43
@@ -935,6 +809,10 @@ const HomePage = () => {
               })
           }
         })
+    },
+
+    setRoute: (routeId) => {
+      console.log('intento setear una ruta : ' + routeId)
     },
 
     route: {
@@ -1065,46 +943,8 @@ const HomePage = () => {
       },
 
       clean: () => {
-
-        if (!map) return
-
+        if (!maparea) return
         document.querySelectorAll('.mapElement').forEach((el) => el.remove())
-        /*
-        if (polyline.layer !== '') {
-          // @ts-ignore: Object is possibly 'null'. 
-          if (map.getLayer(polyline.layer)) {
-            map.removeLayer(polyline.layer).removeSource(polyline.source)
-            setPolyline({ source: 'route', layer: '' })
-          }
-        }
- 
-        if (polygons.length > 0) {
- 
-          for (let i = 0; i < polygons.length; i++) {
- 
-            //if(document.getElementById(polygons[i].layer)) 
-            // @ts-ignore: Object is possibly 'null'.   
-            if (map.getLayer(polygons[i].layer)) {
-              // @ts-ignore: Object is possibly 'null'.   
-              map.removeLayer(polygons[i].layer)
-              delete polygons[i].layer
-            }
- 
-            // @ts-ignore: Object is possibly 'null'.
-            if (map.getLayer(polygons[i].layer2)) {
-              // @ts-ignore: Object is possibly 'null'.   
-              map.removeLayer(polygons[i].layer2)
-              delete polygons[i].layer2
-              map.removeSource(polygons[i].source)
-            }
- 
-          }
- 
-          setPolygons([])
- 
-        }
-        */
-
       },
 
       render: {
@@ -1298,261 +1138,13 @@ const HomePage = () => {
 
   }
 
-  let modes = {
-
-    view: () => {
-      setMode('view')
-      editor.view()
-      drawer.controls.view()
-
-      setRouteId(0)
-      if (routeId !== undefined) drawer.reset()
-      map.flyTo(center)
-    },
-
-    creation: () => {
-      setMode('creation')
-      drawer.controls.creation()
-      editor.creation()
-
-      setRouteId(0)
-
-      drawer.reset()
-      map.flyTo(center)
-    },
-
-    edition: (route) => {
-      setMode('edition')
-      drawer.controls.edition()
-      editor.edition(route)
-
-      drawer.selected(route)
-      myRoutes.setMarkers(route)// PAINTING COMMON POINTERS!!
-
-      let routeCenter = { lat: route.map_data.center_lat, lng: route.map_data.center_long, zoom: route.map_data.center_zoom }
-      map.flyTo(routeCenter)
-    },
-
-    showCreationAdvisory: () => {
-      if (routeId === 0) {
-        if (window.confirm('Do you want to create a new route?')) {
-          //storeCreationAdvisory(Date.now())
-          return true
-        } else {
-          Draw.trash()
-          return false
-        }
-      }
-      return true
-    },
-
-  }
-
-  let editor = {
-
-    view: () => {
-      setButton1(editor.buttons.delete)
-      setButton2(editor.buttons.publish)
-    },
-
-    edition: (route) => {
-      let button1_1 = editor.buttons.delete
-      let button2_1 = null
-      if (route.published) {
-        button1_1.disabled = true
-        button2_1 = editor.buttons.unpublish
-      } else {
-        button2_1 = editor.buttons.publish
-      }
-      setButton1(button1_1)
-      setButton2(button2_1)
-    },
-
-    creation: () => {
-      setButton1(editor.buttons.delete)
-      setButton2(editor.buttons.publish)
-    },
-
-    buttons: {
-
-      edit: {
-        label: 'Edit',
-        color: 'edit',
-        disabled: true,
-        visible: true,
-        className: 'my-button',
-        onClick: (e) => { route.edit() }
-      },
-
-      save: {
-        label: 'Save',
-        color: 'primary',
-        disabled: true,
-        visible: true,
-        className: 'my-button',
-        onClick: (e) => { route.save() }
-      },
-
-      delete: {
-        label: 'Delete',
-        color: 'delete',
-        disabled: true,
-        visible: true,
-        className: 'my-button',
-        onClick: (e) => { route.delete() }
-      },
-
-      publish: {
-        label: 'Publish',
-        color: 'success',
-        disabled: true,
-        visible: true,
-        className: 'my-button',
-        onClick: (e) => { route.togglePublished() }
-      },
-
-      unpublish: {
-        label: 'Unpublish',
-        color: 'success',
-        disabled: false,
-        visible: true,
-        className: 'my-button',
-        onClick: (e) => { route.publish() }
-      }
-
-    },
-
-  }
-
-  let others = {
-
-    contentGrettings: (id) => {
-      return (<Link to={'/admin/plugins/content-manager/collectionType/application::myRoutes.routes/' + id} className='btn btn-primary'>Add media</Link>)
-    },
-
-    validatePublishing: () => {
-      if (testing) console.log('validatePublishing attempt... is route! ;))')
-      getData(host + '/routes' + '/' + routeId)
-        .then(result => {
-
-          if (result.places.length === 0) {
-            funs.launchToast('To publish a good quality route, please set at least a Place...')
-            return false
-          } else {
-            for (let place of result.places) {
-              if (place.description === '' || place.images.length === 0) {
-                funs.launchToast('Please set your Place images, markers and descriptions before publish the route...')
-                return false
-              }
-            }
-          }
-
-        })
-      return true
-    },
-
-    resetPublishButton: () => {
-      setPublishButtonStatus(false)
-      setPublishButtonLabel(createText)
-    },
-
-    setPublishable: () => {
-      setPublishButtonStatus(true)
-      setPublishButtonLabel('Publish')
-      storePublishButtonColor('primary')
-    },
-
-    setUnpublishable: () => {
-      setPublishButtonStatus(true)
-      setPublishButtonLabel('Unpublish')
-      storePublishButtonColor('success')
-    },
-
-    showChangeAdvisory: () => {
-      console.log('routeId', routeId)
-      //let adv = getStorage('routeChangesAdvisory', 'string')
-      //if (!adv) {
-      //  if (window.confirm('Do you want to edit this route?')) {
-      //    setStorage('routeChangesAdvisory', true)
-      //    return true
-      //  } else {
-      //    return false
-      //  }
-      //}
-      //return true
-    },
-
-    launchToast: (message, doContinue = false, label) => {
-      setAlert(message, label)
-      return doContinue
-    },
-
-    setAlert: (message, label = '', content = null) => {
-      setAlertModalMessage(message)
-      setAlertModalLabel(label)
-      setAlertContent(content)
-      setAlertModalStatus(true)
-    },
-
-    closeAlert: (message) => {
-      setAlertModalStatus(false)
-    },
-
-    alertModal: () => {
-      return (
-        <Modal
-          isOpen={false}
-          contentLabel={''}
-          style={alertModalStyle}
-          shouldCloseOnOverlayClick={true}
-        >
-          <div style={{ minHeight: '90%', textAlign: 'center' }}>
-            <Label htmlFor='input' style={{ color: 'white' }} message={''} />
-            <Label htmlFor='input' message={''} />
-            <div>{''}</div>
-          </div>
-          <Button
-            label={'OK'}
-            color={'warning'}
-            onClick={closeAlert}
-          />
-        </Modal>
-      )
-    },
-
-    renderCarrousel: () => {
-      return (
-        <div>
-          <h2> Single Item</h2>
-          <Carousel>
-            <div>
-              <h3>1</h3>
-            </div>
-            <div>
-              <h3>2</h3>
-            </div>
-          </Carousel>
-        </div>
-      )
-    },
-
-  }
-
-  useEffect(init, [])
-  useEffect(myRoutes.switch, [routeId])
-  useEffect(() => { map.flyTo(center) }, [center])
-
   return <div>
-    <div className='row'>
-      <div className='col-sm-8 col-md-8 col-lg-8'>
-        {render.leftPan()}
-      </div>
-      <div className='col-sm-4 col-md-4 col-lg-4'>
-        {routes && render.rightPan()}
-      </div>
+    <div ref={maparea} className='map-container' />
+    <div className='nav-bar'>
+      Lat: {focus.lat.toFixed(2)} • Lng: {focus.lng.toFixed(2)} • Zoom: {Math.round(focus.zoom)}
     </div>
   </div>
 
 }
 
-export default memo(HomePage)
+export default memo(MyMap)

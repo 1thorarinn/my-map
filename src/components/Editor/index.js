@@ -68,6 +68,7 @@ const Editor = () => {
 
       switch: (routeId) => {
         if (routeId === '0') {
+          // Clearing the routes
           setRoute(undefined)
           setCenter(mainCenter)
           editor.modes.creation()
@@ -76,6 +77,7 @@ const Editor = () => {
           let get = host + '/routes/' + routeId
           fetch(get).then((route) => route.json()).then(route=>{
             setRoute(route)
+            setStorage('routeId', parseInt(routeId))
             editor.modes.edition(route)
           })
         }
@@ -109,6 +111,7 @@ const Editor = () => {
       edition: (route) => {
         setMode('edition')
         setStorage('mode', 'edition')
+        setStorage('route', route)
         let button1_1 = editor.buttons.delete
         let button2_1 = null
         if (route.published) {
@@ -636,8 +639,8 @@ const Editor = () => {
                 {instructions && instructions.map((instr, index) => {
                   return <li key={'route-' + index} style={{ cursor: 'pointer' }} onClick={() => editor.launchOption(instr.action_class)} >
                     <Label htmlFor='' style={{ cursor: 'pointer' }} className={'advisory'} >
-                      <img src={host + instr.icon.url} style={{ cursor: 'pointer' }} alt='' />
-                      <span>
+                      <img src={host + instr.icon.url} style={{ cursor: 'pointer', maxHeight: '35px' }} alt='' />
+                      <span style={{marginLeft: '10px'}}>
                         {instr.translations[0].label}
                       </span>
                     </Label>

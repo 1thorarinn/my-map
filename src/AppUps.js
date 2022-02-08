@@ -1,17 +1,3 @@
-/*
- *
- * HomePage
- *
- */
-/* eslint-disable */
-/*
-import PageTitle from '../../components/PageTitle';
-import { useModels } from '../../hooks';
-
-import { get, upperFirst } from 'lodash';
-import { auth, LoadingIndicatorPage } from 'strapi-helper-plugin';
-*/
-
 /* eslint-disable */
 import React, { useRef, useState, useEffect, memo, useMemo, Link } from 'react';
 
@@ -22,6 +8,8 @@ import Modal from 'react-modal'
 import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import { Header } from '@buffetjs/custom';
 import MapboxGL from 'mapbox-gl'
+import Slider from "react-slick";
+
 import routeIcon from './routeIcon.png'
 import placeIcon from './placeIcon.png'
 import polygonIcon from './polygonIcon.png'
@@ -43,11 +31,11 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
+import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
+import { Carousel } from 'react-responsive-carousel';
 import './index.css'
 
-import jQuery from "jquery"
-
-const host ='https://cms.hoponboard.eu';
+const host ='http://161.97.167.92:1337';
 MapboxGL.accessToken = "pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg"
 const MapboxLanguage = require('@mapbox/mapbox-gl-language')
 
@@ -59,7 +47,6 @@ const instructionsOrigin = host+'/instructions'
 const uploadOrigin = host
 
 const mapTile = 'mapbox://styles/mapbox/streets-v11'
-
 
 // Map vars
 const placesLimit = 12
@@ -75,7 +62,7 @@ const mapStyle = {
   top: 0,
   bottom: 0,
   width:'100%',
-  minHeight: '900px'
+  minHeight: '1000px'
 }
 const settings = {
   dots: true,
@@ -88,15 +75,15 @@ const settings = {
 const HomePage = () => {
   
   // User params  
-
+  localStorage.clear()
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
-  const username = 'asfsdfsa'//get(auth.getUserInfo(), 'firstname', '')  
-  const user_id = 13//get(auth.getUserInfo(), 'id', '')
+  const username = 'asdfas';//get(auth.getUserInfo(), 'firstname', '')  
+  const user_id = 13; //get(auth.getUserInfo(), 'id', '')
   if(!user_id){
     location.reload()
   }
-
-  localStorage.setItem('user_id', user_id)  
+  localStorage.setItem('user_id', user_id)
+  
 
   // Map Settings
   const map = useRef(null)
@@ -107,8 +94,7 @@ const HomePage = () => {
 
   //  Map
   const [mapOpts, setRouteOptions] = useState(defaultCenter)
-  const [routeMode, setRouteMode] = useState('')
-
+  const [routeMode, setRouteMode] = useState('create')
   const [isLoading, setIsLoading] = useState(false)
 
   // Map coords
@@ -126,12 +112,6 @@ const HomePage = () => {
   const [routeLabel, setrouteLabel] = useState()
   const [routeDescription, setRouteDescription] = useState()
 
-  const [lastChange, setLastChange] = useState('')
-
-  function storeLastChange(){
-    setLastChange(Date.now())
-  }
-
   //  Publish button parameters
   const [publishButtonLabel, setPublishButtonLabel] = useState( createText)
   const [publishButtonStatus, setPublishButtonStatus] = useState(false)
@@ -145,9 +125,7 @@ const HomePage = () => {
   const [alertModalMessage, setAlertModalMessage] = useState('')
   const [alertModalLabel, setAlertModalLabel] = useState('')
   const [alertContent, setAlertContent] = useState(null)
-  //const [alertContent2, setAlertContent2] = useState(<></>)
 
-  const [element, setElement] = useState('')
   const [placeId, setPlaceId] = useState(0)
   const [placeName, setPlaceName] = useState('')
   const [placeLabel, setPlaceLabel] = useState('')
@@ -161,15 +139,15 @@ const HomePage = () => {
   if (typeof(window) !== 'undefined') { Modal.setAppElement('body') }
   
   const [clientRoutes, setClientRoutes] = useState([])
-  useEffect(() => { 
+  useEffect(() => {     
     fetch(routesOrigin+'?creator='+user_id)
       .then((res) => res.json())
       .then(setClientRoutes)
       .catch(error => { console.error(error) })
-    },[lastChange])
+    },[])
   
   const [instructions, setInstructions] = useState([])
-  useEffect(() => {
+  useEffect(() => { 
     fetch(instructionsOrigin)
       .then((res) => res.json())
       .then(setInstructions)
@@ -177,14 +155,10 @@ const HomePage = () => {
   },[])
 
   useEffect(() => {
-    if(map.current) Draw.deleteAll()
     loadMap()
-    localStorage.setItem('user_id', user_id)
-    storeRouteMode('creation')
-  },[])
+  },[routeId])
 
   function setMapOptions(){
-    //if(!isLoading) return
     if(testing) console.log('setMapOptions!!!')
     setMapLat(map.current.getCenter().lat)
     setMapLng(map.current.getCenter().lng)
@@ -220,157 +194,54 @@ const HomePage = () => {
   }
 
   function renderRoutesSelector(){
-    let empty = clientRoutes.length === 0
-    var options = [{ value: '0', label: (empty ? 'Create a route...' : 'Select a route...') }]
+    var options = [{ value: '0', label: messages.chooseRoute }]
     for(var i = 0; i < clientRoutes.length; i++){
       options.push({ value: clientRoutes[i].id.toString(), label: clientRoutes[i].name })
     }
     return (
       <div>
-        <Label htmlFor='' className={'head-advisory'}>Hello {username}!</Label>
+        <Label htmlFor='' className={'head-advisory'}>{username}, edit your routes!</Label>
         <Select
           name="selected-route"
           className='primary'
           value={routeId}
           options={options}
           closeMenuOnSelect={true}
-          style={{width: '100%', disabled: (empty ? 'disabled' : 'false')}}
-          onChange={({ target: { value } }) => { loadRoute(value) }}
-        >        
+          style={{width: '97%'}}
+          onChange={({ target: { value } }) => { loadRoute(value) }}>        
         </Select>
-        <br/><br/>
-        {routeId !== 0 && <Button style={{display: 'block'}} onClick={()=>{          
-          handleEditDetails()
-        }} className="btn btn-primary">Edit details</Button>}
       </div>
     )
     
   }
 
-  function handleEditDetails(){
-    if(routeId === 0){
-      setAlert('If you want to edit a route, first you must select one', 'Warning!')
-      return false
-    }
-    window.open(host+'/admin/plugins/content-manager/collectionType/application::routes.routes/'+routeId, '_self');
-  }
-
-  function getMarker(markerId){
-    switch(markerId){
-      case 1: return 'start-marker';      
-      case 2: return 'end_marker';        
-      case 3: return 'anchorage-marker'; 
-      case 4: return 'camera-marker';    
-      case 5: return 'restaurant-marker'; 
-      case 7: return 'mylocation-marker'; 
-      case 8: return 'base-marker';       
-      default: return 'standar-marker';   
-    }    
-  }
-  
-  const renderInstructions = () => {
-    return (
-      <div className='col-sm-12 col-md-12 col-lg-12'>
-        <div className='advisory-box col-sm-12 col-md-12 col-lg-12' style={{cursor: 'pointer', display:'inline'}}>
-          <table style={{width:'100%'}}>
-            {instructions.map((instr, index)=>{
-            return  (
-              <tr >
-                <td>           
-                  <img onClick={()=> launchOption(instr.action_class)} src={uploadOrigin+instr.icon.url} alt={instr.summary} style={{cursor: 'pointer'}}/>
-                </td>
-                <td>  
-                  <Label> {instr.summary}</Label>
-                </td>                
-              </tr>
-            )})}
-          </table>
-        </div>
+  function renderCarrousel(){
+    return(
+      <div>
+        <h2> Single Item</h2>
+        <Carousel>
+          <div>
+            <h3>1</h3>
+          </div>
+          <div>
+            <h3>2</h3>
+          </div>
+          <div>
+            <h3>3</h3>
+          </div>
+          <div>
+            <h3>4</h3>
+          </div>
+          <div>
+            <h3>5</h3>
+          </div>
+          <div>
+            <h3>6</h3>
+          </div>
+        </Carousel>
       </div>
     )
   }
-
-  function launchOption(type){
-    jQuery('.mapbox-gl-draw_'+type).click()
-  }
-
-  function loadMap(){
-
-    if (map.current) map.current.deleteAll()
-
-    map.current = new MapboxGL.Map({
-      center: [ focusLng, focusLat ],
-      zoom: focusZoom,
-      containerStyle: mapStyle,
-      container: mapContainer.current,
-      style: mapTile,
-      minZoom: 4,
-      maxZoom: 18
-    })
-
-    map.current.on('load', function () {
-
-      map.current.addControl(Draw, 'top-right');
-      map.current.addControl(new MapboxGLGeocoder({
-        accessToken: MapboxGL.accessToken,
-        marker: false
-      }), 'top-left')
-      map.current.addControl(new MapboxLanguage(), 'top-left');
-      map.current.addControl(new MapboxGL.FullscreenControl(), 'top-left');
-      map.current.addControl(new MapboxGL.GeolocateControl(
-        { positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }), 'top-left'); 
-
-      map.current.on('move', (e) => { setMapOptions() })
-      map.current.on('click', (e) => { editPlace( e, Draw.getSelected() ) })
-
-      map.current.on('draw.add',    (e)=>{ updateRoute(e, Draw.getAll()) })
-      map.current.on('draw.create', (e)=>{ updateRoute(e, Draw.getAll()) })
-      map.current.on('draw.update', (e)=>{ updateRoute(e, Draw.getAll()) })
-      map.current.on('draw.delete', (e)=>{ updateRoute(e, Draw.getAll()) })
-      map.current.on('draw.select', (e)=>{ updateRoute(e, Draw.change()) })
-
-      map.current.resize()
-
-    })
-
-  }
-
-  function editPlace(e, selected){
-    if(testing) console.log('SELECTED')
-    if(testing) console.log(selected)
-    setElement(selected.id)
-    localStorage.setItem('tmpPoint', JSON.stringify(selected.features) )
-    if(selected && selected.features.length > 0){
-      if(testing) console.log(placesOrigin+'?element='+selected.features[0].id)
-      getData(placesOrigin+'?element='+selected.features[0].id)
-      .then(data=>{
-        if(data.statusCode === 400){
-          if(testing) console.log('Something was wrong creating a Polygon')
-        }else{
-          if(testing) console.log('RECOVERED')
-          if(testing) console.log(data)
-          if(!data[0]) return
-          resetPlace(false);
-          setPlaceId(data[0].id)
-          setElement(data[0].element)
-          setPlaceName(data[0].name)
-          setPlaceDescription(data[0].description[0].description)
-          setPlaceModalStatus(true)
-        }
-      })
-    }
-  }
-
-  function resetRouteDraw(){
-    setStorage('routeId', 0, 'string')
-    removeStorage('routeId')
-    Draw.deleteAll()
-    Draw.trash()
-  }
-
-  /*if(getStorage('routeId', 'string') > 0){
-    loadRoute(getStorage('routeId', 'string'))
-  }*/
 
   const routeEditionForm = () => {
     return (
@@ -398,73 +269,142 @@ const HomePage = () => {
     )
   }
 
+  const renderInstructions = () => {
+    return (
+      <div>
+        <div className='advisory-box'>
+          <ul>
+            {instructions.map((instr, index)=>{
+              return <li><Label htmlFor='' className={'advisory'}><img src={uploadOrigin+instr.icon.url} alt={instr.summary}/> {instr.summary}</Label></li>
+            })}          
+            <li><Label htmlFor='' className={'advisory center'}>Don't forget to publish!</Label></li>   
+          </ul>
+        </div>
+      </div>
+    )
+  }
+
+  function loadMap(){
+
+    if (map.current){
+      return
+    }else{
+
+      map.current = new MapboxGL.Map({
+        center: [ focusLng, focusLat ],
+        zoom: focusZoom,
+        containerStyle: mapStyle,
+        container: mapContainer.current,
+        style: mapTile,
+        minZoom: 4,
+        maxZoom: 18
+      })
+  
+      map.current.on('load', function () {  
+        
+        map.current.addControl(Draw, 'top-left');
+  
+        map.current.resize()
+        map.current.addControl(new MapboxGLGeocoder({
+          accessToken: MapboxGL.accessToken,
+          marker: false
+        }))
+  
+        map.current.on('move', (e) => { setMapOptions() })
+        map.current.on('click', (e) => { editPlace( e, Draw.getSelected() ) })
+  
+        map.current.on('draw.add',    (e)=>{ updateRoute(e, Draw.getAll()) })
+        map.current.on('draw.create', (e)=>{ updateRoute(e, Draw.getAll()) })
+        map.current.on('draw.update', (e)=>{ updateRoute(e, Draw.getAll()) })
+        map.current.on('draw.delete', (e)=>{ updateRoute(e, Draw.getAll()) })
+        map.current.on('draw.select', (e)=>{ updateRoute(e, Draw.change()) })
+  
+        map.current.addControl(new MapboxLanguage());
+        map.current.addControl(new MapboxGL.FullscreenControl());
+        map.current.addControl(new MapboxGL.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }));
+  
+        // Draw temporary stored map!!
+        /*if(getStorage('currentRoute')){
+          Draw.deleteAll();
+          Draw.add(getStorage('currentRoute'))
+        }*/       
+  
+      })
+
+    }
+
+  }
+
+  function editPlace(e, selected){
+    if(testing) console.log('SELECTED')
+    if(testing) console.log(selected)
+    if(selected && selected.features.length > 0){
+      if(testing) console.log(placesOrigin+'?element='+selected.features[0].id)
+      getData(placesOrigin+'?element='+selected.features[0].id)
+      .then(data=>{
+        if(testing) console.log('RECOVERED')
+        if(testing) console.log(data)
+        resetPlace(false);
+        storePlaceId(data[0].element)
+        storePlaceName(data[0].name)
+        storePlaceDescription(data[0].description[0].description)
+        setPlaceModalStatus(true)
+      })
+    }
+  }
+
+  function resetRouteDraw(){
+    setStorage('currentRoute', '', 'json')
+    removeStorage('currentRoute')
+    Draw.deleteAll()
+    Draw.trash()
+  }
+
   function loadRoute(selectedRouteId){
-    setIsLoading(true)
+    if(!selectedRouteId) setIsLoading(true)
     if(selectedRouteId === 0){
       resetToCreationMode()
     }else{
-
       fetch(routesOrigin+'/'+selectedRouteId)
       .then((res) => res.json())
       .catch(error => console.error('Error:', error))
       .then(response => {        
-        console.log(response)
         if(response){
           resetToEditonMode(response)
         }else{
           resetToCreationMode()
-        }         
+        }          
       })
     }
   }
 
   function resetToCreationMode(){
-    if(testing) console.log('CREATION MODE!')    
-    Draw.deleteAll()
-    storeRouteMode('creation')
+    if(testing) console.log('CREATION MODE!')
+    resetPublishButton()
     resetRouteDraw()
-    storeRouteId(0)
+    setRouteMode('creation')
+    setRouteId(0)
     setRouteName('')
     setRouteDescription('')
-    resetPublishButton()
+    setTimeout(function(){setIsLoading(false)},3000)
     flyTo(defaultCenter.lat, defaultCenter.lng, defaultCenter.zoom)
-    setTimeout(function(){ setIsLoading(false)},3000)
   }
 
   function resetToEditonMode(response){
     if(testing) console.log('EDITION MODE!::'+response.id)
-    storeRouteMode('edition')
-    Draw.deleteAll()
-    storeRouteId(response.id)
+    resetRouteDraw()
+    setRouteMode('edition')
+    setRouteId(response.id);
     setRouteName(response.name)
-    storeRouteIsPublished(response.published)
     setRouteDescription(response.description[0].description)
-    drawSelectedRoute(response)    
+    setRouteIsPublished(response.published)
+    drawSelectedRoute(response)
     flyTo(response.map_data.center_lat, response.map_data.center_long, response.map_data.center_zoom)
     setTimeout(function(){setIsLoading(false)},3000)
   }
 
-  function storeRouteIsPublished(status){
-    setRouteIsPublished(status)
-    setStorage('routeIsPublished', status, 'string')
-    if(!status){
-      setPublishable()
-    }else{
-      setUnpublishable()
-    }
-  }
-
-  function storeRouteId(id){
-    setRouteId(id)
-    setStorage('routeId', id, 'string')
-  }
-
-  function storeRouteMode(mode){
-    setRouteMode(mode)
-    setStorage('routeMode', mode, 'string')
-  }
-
   function drawSelectedRoute(response){
+    resetRouteDraw()
     let selected = defSelected
     Draw.add(response.map_data.data)
     selected.features.push(response.map_data.data)
@@ -492,18 +432,17 @@ const HomePage = () => {
   // Saved  route operations
 
   function updateRoute(mapElement, data){
-    console.log(mapElement)
-    if( getStorage('routeMode', 'string') === 'edition'){     
+    var mode = getStorage('routeMode', 'string')
+    if( mode === 'edition'){     
       editionModeAction(mapElement)
     }else{
       creationModeAction(mapElement)
     }
-  }  
+  }
 
   function editionModeAction(mapElement){
-    if(!routeUnselected()){
-      let route = getStorage('routeId', 'string')      
-      if(testing) console.log('Edition route mode '+route+' action!')
+    if(!routeUnselected()){      
+      if(testing) console.log('Edition route mode '+routeId+' action!')
       if(showChangeAdvisory()){  
         if(mapElement.action !== undefined){  
           if(mapElement.action === 'change_coordinates' || mapElement.action === 'move'){
@@ -540,7 +479,7 @@ const HomePage = () => {
 
         if(mapElement.type === 'draw.create'){
 
-          var name          = 'New route'
+          var name          = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route'
           //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
           var description   = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
           var isLineString  = mapElement.features[0].geometry.type === 'LineString'
@@ -565,7 +504,7 @@ const HomePage = () => {
               
               if(testing) console.log('You have created the element id '+res.map_data.data.id+' as route with the id "'+res.id+'"')
 
-              resetToEditonMode(res)
+              setRouteMode('edition')
               storeChangeAdvisory(true)
 
               if(isLineString){
@@ -575,18 +514,12 @@ const HomePage = () => {
                 setRouteId(res.id)
                 setRouteName(name)
                 setRouteDescription(description)  
-                setPublishButtonStatus(!true)
-                storeLastChange()
+                //setPublishButtonStatus(!true)
                 
                 setRoute(res.map_data.data)
-                setAlert('You have created the new route!!', 'GRETTINGS!', 
-                'Now is the moment to create Place or Polygons, \nYou must to edit the Route and each Place rich contents to have the best result.')
+                setAlert('You have created the new route  \n "'+routeName+'"', 'GRETTINGS!', contentGrettings(res.id))
 
               }else{
-
-                // This blocks my fist idea to be able to create all from a pointer or a polygon, because it can cause logic problems....
-                setAlert('Please, trace a route first!', 'WARNING!')
-                return
 
                 if(type === 'Point'){
                   if(testing) console.log('The element is a Point')
@@ -616,26 +549,25 @@ const HomePage = () => {
 
   }
 
-  function contentGrettings(){
-    return <Link to={host+"/admin/plugins/content-manager/collectionType/application::routes.routes/"+routeId} target="_self" className="btn btn-link">Edit details</Link>
+  function contentGrettings(id){
+    return (<Link to={"/admin/plugins/content-manager/collectionType/application::routes.routes/"+id} className="btn btn-primary">Add media</Link>)
   }
 
   function resetPlace(status){
     setPlaceModalStatus(status)
     if(!status){
-      setPlaceId(0)
-      setPlaceName('')
-      setPlaceLabel('')
-      setPlaceDescription('')
+      storePlaceId(0)
+      storePlaceName('')
+      storePlaceLabel('')
+      storePlaceDescription('')
     }
   }
 
   function updateRouteExtra(){
     if(!routeUnselected()){
       setIsLoading(true)
-      var route = getStorage('routeId', 'string')
-      if(route){
-        putData(routesOrigin+'/'+route, {
+      if(routeName !== '' && routeDescription !== ''){//&& routeLabel !== ''
+        putData(routesOrigin+'/'+routeId, {
           "name" : routeName,
           "description":[{
             "language" : 1,
@@ -771,91 +703,12 @@ const HomePage = () => {
     })
   }
 
-  function updatePlace(){
-    let url = placesOrigin
-    let urlGet = url+'?element='+element
-    getData(urlGet)
-    .then(response => {
-
-      if(response.statusCode === 400){
-        if(testing) console.log('Something was wrong with updateRouteElement action...')
-      }else{
-        putData(placesOrigin+'/'+response.id, {
-          "name": placeName,
-          "description": [{
-            "language": 1,
-            "label": placeName,// 'New route label',
-            "description": placeDescription
-          }],
-          'map_data': setMapData(placeFeatures)
-        })
-        .then(data => {
-          if(data.statusCode === 400){
-            if(testing) console.log('Something was wrong with creating a Place...')
-          }else{
-            if(testing) console.log('Place '+placeFeatures.id+' posted successful ;)')
-          }
-        })
-      }
-
-    })
-  }
-
-  function updatePlaceTexts(){
-    var url = placesOrigin
-    var urlGet = url+'?element='+element
-    console.log('url_get_element', urlGet)
-    getData(urlGet)
-    .then(response => {
-      if(response.statusCode === 400){
-        if(testing) console.log('Something was wrong with updateRouteElement action...')
-      }else{
-        setPlaceId(response[0].id)
-        putData(placesOrigin+'/'+response[0].id, {
-          "name": placeName,
-          "description": [{
-            "language": 1,
-            "label": placeName,// 'New route label',
-            "description": placeDescription
-          }],
-        })
-        .then(data => {
-          if(data.statusCode === 400){
-            if(testing) console.log('Something was wrong with creating a Place...')
-          }else{
-            if(testing) console.log('Place '+placeId+' posted successful ;)')
-            setPlaceModalStatus(false)
-          }
-        })
-      }
-
-    })
-  }
-
-
-  function savePlace(event){
-    event.preventDefault()
-    var mapElement = getStorage('tmpPoint', 'json')
-    if(mapElement !== ''){//Undo
-      if(placeName === '' && placeDescription === ''){//&& placeLabel === '' 
-        setAlert('You must to put data in the placename and description')
-      }else{
-        postPlace(mapElement) 
-      }
-    }else{
-      setAlert('Theres is not data to save about the place');
-      Draw.trash()  
-      setPlaceModalStatus(false)    
-    }    
-  }
-
   function postPlace(placeFeatures){
     if(!placeFeatures) return false
-    var route = getStorage('routeId','string')
     postData(placesOrigin, {
       "name": placeName,
       "creator": user_id,
-      "parent_route" : route,
+      "parent_route" : routeId,
       "element": placeFeatures.id,
       "description": [{
         "language": 1,
@@ -875,11 +728,10 @@ const HomePage = () => {
   }
 
   function postPolygon(polygonFeatures, i){
-    var route = getStorage('routeId','string')
     postData(polygonsOrigin, {
-      "name": routeName+' Warning '+route+'-'+i.toString(),
+      "name": routeName+' Warning '+routeId+'-'+i.toString(),
       "creator": user_id,
-      "parent_route" : route,      
+      "parent_route" : routeId,      
       "element": polygonFeatures.id,
       'map_data': setMapData(polygonFeatures)
     })
@@ -895,7 +747,6 @@ const HomePage = () => {
   // For Publish button
 
   function togglePublished(){
-    var route = getStorage('routeId','string')
     if(testing) console.log('togglePublished: Is published: '+routeIsPublished)
     if(routeIsPublished){
       if(testing) console.log('Unpublishing??')
@@ -918,7 +769,7 @@ const HomePage = () => {
       }
     }    
 
-    putData(routesOrigin+'/'+route, { published: ! routeIsPublished })        
+    putData(routesOrigin+'/'+routeId, { published: ! routeIsPublished })        
     .then(data => {
       let action = ( ( !  routeIsPublished ) ? 'published' : 'unpublished' )
       setAlert('The Route "'+routeName+'" was succesfully '+action+'!')
@@ -928,8 +779,8 @@ const HomePage = () => {
   function validatePublishing() {
 
     if(testing) console.log('validatePublishing attempt... is Route! ;))')
-    var route = getStorage('routeId','string')
-    getData(routesOrigin+'/'+route)
+
+    getData(routesOrigin+'/'+routeId)
     .then(result=>{
 
      /* Only if routes have more data... 
@@ -941,13 +792,12 @@ const HomePage = () => {
         return false
       }else*/ 
       
-      if(!result.places.length){
+      if(result.places.length === 0){
         launchToast('To publish a good quality Route, please set at least a Place...')
         return false
       }else{
         for( var i = 0; i < result.places.length; i++){
-          if(! result.places[i].description || 
-             ! result.places[i].images){
+          if(result.places[i].description === '' || result.places[i].images.length === 0){
             launchToast('Please set your Place images, markers and descriptions before publish the Route...')
             return false
           }
@@ -961,23 +811,20 @@ const HomePage = () => {
   }
 
   function resetPublishButton(){
-    console.log('resetPublishButton')
     setPublishButtonStatus(false)
     setPublishButtonLabel(createText)
   }
 
   function setPublishable(){
-    console.log('setPublishable')
     setPublishButtonStatus(true)
     setPublishButtonLabel('Publish')
-    setPublishButtonColor('primary')
+    storePublishButtonColor('primary')
   }
 
   function setUnpublishable(){
-    console.log('setUnpublishable')
     setPublishButtonStatus(true)
     setPublishButtonLabel('Unpublish')
-    setPublishButtonColor('success')
+    storePublishButtonColor('success')
   }
 
   function launchToast(message, doContinue=false, label){
@@ -1014,24 +861,12 @@ const HomePage = () => {
     return true
   }
 
-  // For Advisories
-
-  function storeCreationAdvisory(date){
-    console.log('created')
-    setRouteCreationAdvisory(date)
-    setStorage('routeCreationAdvisory', date, 'string')
-  }
-
-  function storeChangeAdvisory(date){
-    setRouteChangesAdvisory(date)
-    setStorage('routeChangesAdvisory', date, 'string')
-  }
-
   function deleteRoute(){
     if(window.confirm('ALERT:\nIf you delete the route this will delete on cascade all the related content.\n\nDo you want continue??')){
-      getData(routesOrigin+'/'+routeId)
+      let route_id = getStorage('routeId','string')
+      getData(routesOrigin+'/'+route_id)
       .then(result=>{
-        deleteData(routesOrigin+'/'+routeId)
+        deleteData(routesOrigin+'/'+route_id)
         .then(result2=>{
           if(result2.statusCode === 400){
             if(testing) console.log('Something was wrong deleting places on route delete cascade')
@@ -1056,7 +891,6 @@ const HomePage = () => {
                 }
               })
             }
-            storeLastChange()
             return true
           }
         })        
@@ -1067,6 +901,8 @@ const HomePage = () => {
   }
 
   // For places
+
+
 
   function cancelPlaceEdition(){
     var mapElement = getStorage('tmpPoint', 'json')
@@ -1080,6 +916,22 @@ const HomePage = () => {
     }else{
       resetPlace(false)
     }
+  }
+
+  function savePlace(event){
+    event.preventDefault()
+    var mapElement = getStorage('tmpPoint', 'json')
+    if(mapElement !== ''){//Undo
+      if(placeName === '' && placeDescription === ''){//&& placeLabel === '' 
+        return false
+      }else{
+        postPlace(mapElement) 
+      }
+    }else{
+      setAlert('Theres is not data to save about the place');
+      Draw.trash()  
+      setPlaceModalStatus(false)    
+    }    
   }
 
   function editPlaceModal(){
@@ -1103,12 +955,28 @@ const HomePage = () => {
               placeholder='Set here the Place Name for this Route...'
               required={true}
               style={{width: '171%'}}
-              onChange={({ target: { value } }) =>{setPlaceName(value)}}
+              onChange={({ target: { value } }) =>{storePlaceName(value)}}
             />
           </div>
           <div className='row'>
             <span style={{color: placeName ? 'white' : 'red'}}>Please, set a place name...</span>
           </div>
+          {/*<div className='row'>
+            <Label htmlFor="place-label">Label</Label>
+            <InputText
+              type='text'
+              name='place-label'
+              className='my-input'
+              value={placeLabel} 
+              placeholder='Set here the place label for this route...'
+              required={true}
+              style={{width: '171%'}}
+              onChange={({ target: { value } }) =>{storePlaceLabel(value)}}
+            />
+          </div>
+          <div className='row'>
+            <span style={{color: placeLabel ? 'white' : 'red'}}>Please, set a place label...</span>
+          </div>*/}
           <div className='row'>
             <Label htmlFor="place-description">Description</Label>
             <Textarea
@@ -1117,7 +985,7 @@ const HomePage = () => {
               placeholder='Set here the description for this place...'
               required={true}
               style={{maxHeight: '261px', height: '261px'}}
-              onChange={({ target: { value } }) =>{setPlaceDescription(value)}}
+              onChange={({ target: { value } }) =>{storePlaceDescription(value)}}
               value={placeDescription}
             />
           </div>
@@ -1130,7 +998,7 @@ const HomePage = () => {
               <Button
                 label={'Save'}
                 type="submit"            
-                onClick={placeId ? updatePlaceTexts : savePlace}
+                onClick={savePlace}
                 className='my-button'
               />
             </div>
@@ -1148,14 +1016,11 @@ const HomePage = () => {
     )
   }
 
-  function setAlert(message, label='', header = null){
-    if(!message) return
+  function setAlert(message, label='', content = null){
     setAlertModalMessage(message)
     setAlertModalLabel(label)
+    setAlertContent(content)
     setAlertModalStatus(true)
-    if(typeof header === 'string'){
-      setAlertContent(header)
-    }
   }
 
   function closeAlert(message){
@@ -1171,7 +1036,7 @@ const HomePage = () => {
         shouldCloseOnOverlayClick={true}
       >
         <div style={{minHeight :'90%', textAlign: 'center'}}>
-          <Label htmlFor="input" clasName={'labelAlert'} style={{color: 'white', fontWeight: 'bold', fontSize: '1.2rem'}} message={alertModalLabel}/>
+          <Label htmlFor="input" style={{color: 'white'}} message={alertModalLabel}/>
           <Label htmlFor="input" message={alertModalMessage} />
           <div>{alertContent}</div>
         </div> 
@@ -1187,11 +1052,11 @@ const HomePage = () => {
   return (
     <div>
       <div className="row">
-        <div className="col-sm-12 col-md-9 col-lg-9">
+        <div className="col-8 col-md-8">
           <div ref={mapContainer} className="map-container" />
           <div className="nav-bar">Longitude: {focusLng.toFixed(4)} • Latitude: {focusLat.toFixed(4)} • Zoom: {Math.round(focusZoom)}</div>
         </div>
-        <div className="col-sm-12 col-md-3 col-lg-3">
+        <div className="col-md-4 col-lg-4">
           <div className='row'>
             <div className='col-6' style={{textAlign: 'center'}}>
               <Button
@@ -1215,14 +1080,15 @@ const HomePage = () => {
             </div>
           </div>
           <br/>  
-          <div className='col-sm-12 col-md-12 col-lg-12'>
+          <div className='col-12'>
             <div className='row'>
               {renderRoutesSelector()}
               {renderInstructions()}
+              {renderCarrousel()}
               <LoadingBar style={{width:'100%', opacity: isLoading ? 99 : 0}}/>
             </div>
           </div>
-          <div className='col-sm-12 col-md-12 col-lg-12'>
+          <div className='col-12'>
             <div className='row route-creator'>
               <Label htmlFor="route-description">Description</Label>
               <Textarea

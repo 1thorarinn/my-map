@@ -164,52 +164,6 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
     
     onDelete: (mapElement) => {
 
-      if (routeIsPublished) {
-        setAlert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
-        return false
-      }
-
-      var url = ''
-      var type = mapElement.features[0].geometry.type
-      switch (type) {
-        case 'Point':
-          url = host + '/my-places'
-          break
-        case 'Polygon':
-          url = host + '/polygons'
-          break
-        case 'LineString':
-          url = host + '/routes'
-          break
-        default: break
-      }
-
-      if (type === 'Point') {
-        if (!window.confirm('ALERT:\nIf you delete this Place you will lose all the related content.\n\nDo you want to continue?')) {
-          return false
-        }
-      }
-
-      if (type === 'LineString') {
-        if (!window.confirm('ALERT:\nIf you delete this route you will must to put a new one.\n\nConsider first to edit the existent one.\n\nDo you want to continue?')) {
-          return false
-        }
-      }
-
-      let getUrl = url + '?element=' + mapElement.features[0].id
-      getData(getUrl).then(response => {
-        var delUrl = url + '/' + response[0].id
-        deleteData(delUrl)
-          .then(data => {
-            if (data.statusCode === 400) {
-              if (testing) console.log('Something was wrong deleting a route element')
-            } else {
-              Draw.delete()
-              Draw.trash()
-              if (testing) console.log('The MapElement ' + mapElement.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
-            }
-          })
-      })
     },
 
 
@@ -361,11 +315,11 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
       getStorage('mode').then(mode => {
         switch (mode) {
           case 'edition': {
-            drawer.onEdition(mapElement)
+            drawer.onEdition(e)
           } break
           default:
           case 'creation': {
-            drawer.onCreate(mapElement)
+            drawer.onCreate(e)
           } break
         }
       })
@@ -381,6 +335,58 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
         all: draw
       }      
       process(summary)
+      getStorage('route')
+      .then(route=>{
+        if (route.published) {
+          setAlert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
+          return false
+        }
+      })
+
+
+      var url = ''
+      var type = e.features[0].geometry.type
+      switch (type) {
+        case 'Point':
+          url = host + '/my-places'
+          break
+        case 'Polygon':
+          url = host + '/polygons'
+          break
+        case 'LineString':
+          url = host + '/routes'
+          break
+        default: break
+      }
+
+      if (type === 'Point') {
+        if (!window.confirm('ALERT:\nIf you delete this Place you will lose all the related content.\n\nDo you want to continue?')) {
+          return false
+        }
+      }
+
+      if (type === 'LineString') {
+        if (!window.confirm('ALERT:\nIf you delete this route you will must to put a new one.\n\nConsider first to edit the existent one.\n\nDo you want to continue?')) {
+          return false
+        }
+      }
+
+      let getUrl = url + '?element=' + e.features[0].id
+      console.log(getUrl)
+      return
+      getData(getUrl).then(response => {
+        var delUrl = url + '/' + response[0].id
+        deleteData(delUrl)
+          .then(data => {
+            if (data.statusCode === 400) {
+              if (testing) console.log('Something was wrong deleting a route element')
+            } else {
+              Draw.delete()
+              Draw.trash()
+              if (testing) console.log('The MapElement ' + e.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
+            }
+          })
+      })
     },
 
   }
@@ -411,31 +417,25 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
     },
 
     selected: (routeData) => {
-
+      // Draw the selected routeData map elements!!!...
       let selected = { type: 'FeatureCollection', features: [] }
-      Draw.add(routeData.map_data.data)
       selected.features.push(routeData.map_data.data)
       if (routeData.places !== undefined) {
         for (let place of routeData.places) {
-          let data = place.map_data.data
-          Draw.add(data)
-          selected.features.push(data)
+          selected.features.push(place.map_data.data)
         }
       }
       if (routeData.polygons !== undefined) {
         for (let polygon of routeData.polygons) {
-          let data = polygon.map_data.data
-          Draw.add(data)
-          selected.features.push(data)
+          selected.features.push(polygon.map_data.data)
         }
       }
-    },
-
-    
+      for(let feature of selected.features){
+        Draw.add(feature)
+      }
+    },    
 
     launchOption: (type) => jQuery('.mapbox-gl-draw_' + type).click(),
-
-
 
     onCreate: (mapElement) => {
 
@@ -517,11 +517,25 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
     },
 
+    showChangeAdvisory: () => {
+      console.log('routeId', routeId)
+      //let adv = getStorage('routeChangesAdvisory', 'string')
+      //if (!adv) {
+      //  if (window.confirm('Do you want to edit this route?')) {
+      //    setStorage('routeChangesAdvisory', true)
+      //    return true
+      //  } else {
+      //    return false
+      //  }
+      //}
+      //return true
+      },
+
     onEdition: (mapElement) => {
       getStorage('mode').then(mode => {
         if(mode === 'edition'){
-          if (testing) console.log('Edition route mode ' + routeId + ' action!')
-          if (showChangeAdvisory()) {
+          if (testing) console.log('Edition route mode ' + mode + ' action!')
+          if (drawer.showChangeAdvisory()) {
             if (mapElement.action !== undefined) {
               if (mapElement.action === 'change_coordinates' || mapElement.action === 'move') {
                 myRoutes.updateElement(mapElement)

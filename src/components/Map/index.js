@@ -1,11 +1,12 @@
 /* eslint-disable */
-import React, { useRef, useState, useEffect, memo } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
 
 import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import 'react-tabs/style/react-tabs.css'
 import MapboxGL, { Map, FullscreenControl, GeolocateControl } from 'mapbox-gl'
 import jQuery from 'jquery'
-import { setStorage, removeStorage, getStorage, getData, Draw, deleteData, getCenter } from '../../map-utils.js';
+import { setStorage, removeStorage, getStorage, getData, Draw, deleteData, getCenter } from '../../map-utils.js'
+import { host, testing, mapboxToken } from '../../hob-const.js'
 
 import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
@@ -13,13 +14,9 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'react-responsive-carousel/lib/styles/carousel.min.css' // requires a loader
 
-MapboxGL.accessToken = 'pk.eyJ1IjoiZHJ1bGxhbiIsImEiOiJja2l4eDBpNWUxOTJtMnRuejE1YWYyYThzIn0.y7nuRLnfl72qFp2Rq06Wlg'
+MapboxGL.accessToken = mapboxToken
 
 const MapboxLanguage = require('@mapbox/mapbox-gl-language')
-
-const testing = true
-
-const host = 'https://cms.hoponboard.eu'
 
 const mapBoxDetails = {
 
@@ -53,7 +50,7 @@ const mapBoxDetails = {
 
 }
 
-const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => {
+let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selectedElement, setSelectedElement }) => {
 
   // MAIN
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
@@ -64,43 +61,10 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
   // REFERENCES
   const maparea = useRef(null)
+  const [summary, setSummary] = useState(null)
   const [focus, setFocus] = useState(mapBoxDetails.defCenter)
 
-  useEffect(() => { states.init() }, [])
-  useEffect(() => { states.route(route) }, [route])
-  useEffect(() => { states.center(center) }, [center])
-  //useEffect(() => { states.routeId(routeId) }, [routeId])
-  //useEffect(() => { states.routes(routes) }, [routes])
-
-  const states = {
-
-    init: () => { map.init() },
-    
-    route: (route) => {
-      // Loar a route or reset draw...
-      if (route) {
-        myRoutes.load(route)
-      } else {
-        drawer.reset()
-      }
-    },
-
-    center: (center) => {
-      // Set new map center
-      map.flyTo(center)
-    },
-
-    /*
-    routeId: (routeId) => { myRoutes.switch(routeId) },
-
-    routes: (routes) => {
-      //myRoutes.load(routes)
-    },
-    */
-
-  }
-
-  let map = {
+  const map = {
 
     init: async () => {
       let centerNow = center ? center : mapBoxDetails.defCenter
@@ -160,34 +124,6 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
     setRoute: (route) => { myRoutes.switch(route) },
 
-    /*
-    
-    onDelete: (mapElement) => {
-
-    },
-
-
-      click: (e, selected) => {
-        console.log('map.actions.click', e, selected.features)
-        if (selected.features.length > 0) {
-          let summary = {
-            action: 'click',
-            type: selected.features[0].geometry.type,
-            id: selected.features[0].id,
-            data: selected.features[0]
-          }
-          console.log('map.select', summary)
-          setStorage('selectedElement', summary)
-        } else {
-          // Click on the map and unhold selected element from memory!!!
-          setStorage('selectedElement', null)
-        }
-
-      },
-
-    }
-    */
-
     flyTo: (center) => {
       if (!center) return
       setCenter(center)
@@ -198,6 +134,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
       sweep: () => {
         // The map sweeping actions...
+        if (!maparea.current) return
         let curFocus = {
           lat: maparea.current.getCenter().lat,
           lng: maparea.current.getCenter().lng,
@@ -228,6 +165,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
         }
 
+        setSelectedElement(selected)
         setStorage('selected', selected)
         console.log(summary)
 
@@ -236,6 +174,188 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
     },
 
   }
+
+  const drawer = {
+
+    //
+    reset: () => {
+      Draw.deleteAll()
+      Draw.trash()
+      myRoutes.route.clean()
+    },
+
+    selected: (routeData) => {
+      // Draw the selected routeData map elements!!!...
+      let selected = { type: 'FeatureCollection', features: [] }
+      selected.features.push(routeData.map_data.data)
+      if (routeData.places !== undefined) {
+        for (let place of routeData.places) {
+          selected.features.push(place.map_data.data)
+        }
+      }
+      if (routeData.polygons !== undefined) {
+        for (let polygon of routeData.polygons) {
+          selected.features.push(polygon.map_data.data)
+        }
+      }
+      for (let feature of selected.features) {
+        Draw.add(feature)
+      }
+    },
+
+    launchOption: (type) => jQuery('.mapbox-gl-draw_' + type).click(),
+
+    onCreate: (mapElement) => {
+
+      console.log('onCreate', mode, routeId)
+
+      /*if (routeId === '0') {
+
+        if (testing) console.log('Creation mode map action!')
+
+        if (showCreationAdvisory()) {
+
+          if (mapElement.type === 'drawer.create') {
+
+            let name = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route'
+            //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
+            let description = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
+            let isLineString = mapElement.features[0].geometry.type === 'LineString'
+            let type = mapElement.features[0].geometry.type
+
+            postData(host + '/routes', {
+              'name': name,
+              'creator': user_id,
+              'element': mapElement.features[0].id,
+              'description': [{
+                'language': 1,
+                'label': name,//label,
+                'description': description
+              }],
+              'map_data': map.setMapData(isLineString ? mapElement.features[0] : '')
+            })
+              .then(res => {
+
+                if (res.statusCode === 400) {
+                  if (testing) console.log('Something was wrong with onUpdate creation mode action...')
+                } else {
+
+                  if (testing) console.log('You have created the element id ' + res.map_data.data.id + ' as route with the id ' + res.id)
+
+                  setMode('edition')
+                  storeChangeAdvisory(true)
+
+                  if (isLineString) {
+
+                    // Setting main inputs ;)
+                    if (testing) console.log('The element is a LineString')
+                    setRouteId(res.id)
+                    setRouteName(name)
+                    setRouteDescription(description)
+                    //setPublishButtonStatus(!true)
+
+                    setRoute(res.map_data.data)
+                    console.log('You have created the new route  \n ' + routeName, 'GRETTINGS!', contentGrettings(res.id))
+
+                  } else {
+
+                    if (type === 'Point') {
+                      if (testing) console.log('The element is a Point')
+                      //XXX: The point requires a modal to save the textual data
+                      resetPlace(true);
+                      setStorage('tmpPoint', mapElement.features[0], 'json')
+                    } else if (type === 'Polygon') {
+                      if (testing) console.log('The element is a Polygon')
+                      polygon.post(mapElement.features[0], newId)
+                    }
+
+                  }
+
+                  setPublishable()
+
+                }
+
+              })
+
+          }
+
+        } else {
+          if (testing) console.log('Burp...')
+        }
+
+      }else{
+        console.log('route id was ', routeId)
+      }*/
+
+    },
+
+    showChangeAdvisory: () => {
+      console.log('routeId', routeId)
+      //let adv = getStorage('routeChangesAdvisory', 'string')
+      //if (!adv) {
+      //  if (window.confirm('Do you want to edit this route?')) {
+      //    setStorage('routeChangesAdvisory', true)
+      //    return true
+      //  } else {
+      //    return false
+      //  }
+      //}
+      //return true
+    },
+
+    onEdition: (mapElement) => {
+      if (mode === 'edition') {
+        if (testing) console.log('Edition route ' + routeId + ' with mode ' + mode + '!')
+        if (drawer.showChangeAdvisory()) {
+          if (mapElement.action !== undefined) {
+            if (mapElement.action === 'change_coordinates' || mapElement.action === 'move') {
+              myRoutes.updateElement(mapElement)
+            } else {
+              if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+            }
+          } else {
+            if (mapElement.features[0].geometry.type === 'LineString') {
+              let storedLinesAmount = checkFeaturesAmount(route, 'LineString')
+              if (storedLinesAmount > 1) {
+                console.log('You cannot add more than one route. Delete one!')
+                return false
+              }
+            }
+            switch (mapElement.type) {
+              case 'drawer.create':
+                map.createMapElement(mapElement)
+                break
+              case 'drawer.update':
+                myRoutes.updateElement(mapElement)
+                break
+              case 'drawer.delete':
+                map.onDelete(mapElement)
+                break
+              default:
+                if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+                break
+            }
+          }
+        }
+      } else {
+        if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
+      }
+    }
+
+  }
+
+  let process = useCallback((summary) => {
+    console.log('mode', route, mode)
+    /*switch (mode) {
+      case 'edition': {
+        drawer.onEdition(summary)
+      } break
+      default:
+      case 'creation': {
+        drawer.onCreate(summary)
+      } break
+    }*/
+  },[route, mode])
 
   // All the draw actions
   const draw = {
@@ -312,20 +432,19 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
         all: draw
       }
       process(summary)
-      getStorage('mode').then(mode => {
-        switch (mode) {
-          case 'edition': {
-            drawer.onEdition(e)
-          } break
-          default:
-          case 'creation': {
-            drawer.onCreate(e)
-          } break
-        }
-      })
+      switch (mode) {
+        case 'edition': {
+          drawer.onEdition(e)
+        } break
+        default:
+        case 'creation': {
+          drawer.onCreate(e)
+        } break
+      }
     },
 
     delete: (e, draw) => {
+
       let summary = {
         draw: 'delete',
         action: e.action,
@@ -333,16 +452,14 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
         type: e.features[0].geometry.type,
         data: e.features[0],
         all: draw
-      }      
-      process(summary)
-      getStorage('route')
-      .then(route=>{
-        if (route.published) {
-          setAlert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
-          return false
-        }
-      })
+      }
 
+      process(summary)
+
+      if (route.published) {
+        console.log('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
+        return false
+      }
 
       var url = ''
       var type = e.features[0].geometry.type
@@ -391,194 +508,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
   }
 
-  
-  const process= (summary)=>{
-    getStorage('mode').then(mode => {
-      switch (mode) {
-        case 'edition': {
-          drawer.onEdition(summary)
-        } break
-        default:
-        case 'creation': {
-          drawer.onCreate(summary)
-        } break
-      }
-    })
-  }
-
-
-  let drawer = {
-
-    //
-    reset: () => {
-      Draw.deleteAll()
-      Draw.trash()
-      myRoutes.route.clean()
-    },
-
-    selected: (routeData) => {
-      // Draw the selected routeData map elements!!!...
-      let selected = { type: 'FeatureCollection', features: [] }
-      selected.features.push(routeData.map_data.data)
-      if (routeData.places !== undefined) {
-        for (let place of routeData.places) {
-          selected.features.push(place.map_data.data)
-        }
-      }
-      if (routeData.polygons !== undefined) {
-        for (let polygon of routeData.polygons) {
-          selected.features.push(polygon.map_data.data)
-        }
-      }
-      for(let feature of selected.features){
-        Draw.add(feature)
-      }
-    },    
-
-    launchOption: (type) => jQuery('.mapbox-gl-draw_' + type).click(),
-
-    onCreate: (mapElement) => {
-
-      if (routeId === 0) {
-
-        if (testing) console.log('Creation mode map action!')
-
-        if (showCreationAdvisory()) {
-
-          if (mapElement.type === 'drawer.create') {
-
-            let name = (getStorage('routeName', 'string')) ? getStorage('routeName', 'string') : 'New route'
-            //var label         = (getStorage('routeLabel', 'string')) ? getStorage('routeLabel', 'string') : 'New route label'
-            let description = (getStorage('routeDescription', 'string')) ? getStorage('routeDescription', 'string') : 'New route description...'
-            let isLineString = mapElement.features[0].geometry.type === 'LineString'
-            let type = mapElement.features[0].geometry.type
-
-            postData(host + '/routes', {
-              'name': name,
-              'creator': user_id,
-              'element': mapElement.features[0].id,
-              'description': [{
-                'language': 1,
-                'label': name,//label,
-                'description': description
-              }],
-              'map_data': map.setMapData(isLineString ? mapElement.features[0] : '')
-            })
-              .then(res => {
-
-                if (res.statusCode === 400) {
-                  if (testing) console.log('Something was wrong with onUpdate creation mode action...')
-                } else {
-
-                  if (testing) console.log('You have created the element id ' + res.map_data.data.id + ' as route with the id ' + res.id)
-
-                  setMode('edition')
-                  storeChangeAdvisory(true)
-
-                  if (isLineString) {
-
-                    // Setting main inputs ;)
-                    if (testing) console.log('The element is a LineString')
-                    setRouteId(res.id)
-                    setRouteName(name)
-                    setRouteDescription(description)
-                    //setPublishButtonStatus(!true)
-
-                    setRoute(res.map_data.data)
-                    setAlert('You have created the new route  \n ' + routeName, 'GRETTINGS!', contentGrettings(res.id))
-
-                  } else {
-
-                    if (type === 'Point') {
-                      if (testing) console.log('The element is a Point')
-                      //XXX: The point requires a modal to save the textual data
-                      resetPlace(true);
-                      setStorage('tmpPoint', mapElement.features[0], 'json')
-                    } else if (type === 'Polygon') {
-                      if (testing) console.log('The element is a Polygon')
-                      polygon.post(mapElement.features[0], newId)
-                    }
-
-                  }
-
-                  setPublishable()
-
-                }
-
-              })
-
-          }
-
-        } else {
-          if (testing) console.log('Burp...')
-        }
-
-      }
-
-    },
-
-    showChangeAdvisory: () => {
-      console.log('routeId', routeId)
-      //let adv = getStorage('routeChangesAdvisory', 'string')
-      //if (!adv) {
-      //  if (window.confirm('Do you want to edit this route?')) {
-      //    setStorage('routeChangesAdvisory', true)
-      //    return true
-      //  } else {
-      //    return false
-      //  }
-      //}
-      //return true
-      },
-
-    onEdition: (mapElement) => {
-      getStorage('mode').then(mode => {
-        if(mode === 'edition'){
-          if (testing) console.log('Edition route mode ' + mode + ' action!')
-          if (drawer.showChangeAdvisory()) {
-            if (mapElement.action !== undefined) {
-              if (mapElement.action === 'change_coordinates' || mapElement.action === 'move') {
-                myRoutes.updateElement(mapElement)
-              } else {
-                if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
-              }
-            } else {
-              if (mapElement.features[0].geometry.type === 'LineString') {
-                let storedLinesAmount = checkFeaturesAmount(route, 'LineString')
-                if (storedLinesAmount > 1) {
-                  setAlert('You cannot add more than one route. Delete one!')
-                  return false
-                }
-              }
-              switch (mapElement.type) {
-                case 'drawer.create':
-                  map.createMapElement(mapElement)
-                  break
-                case 'drawer.update':
-                  myRoutes.updateElement(mapElement)
-                  break
-                case 'drawer.delete':
-                  map.onDelete(mapElement)
-                  break
-                default:
-                  if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
-                  break
-              }
-            }
-          }
-        }else{
-          if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
-        }
-
-      })
-
-
-
-    }
-
-  }
-
-  let modes = {
+  const modes = {
 
     creation: () => {
       //setMode('creation')
@@ -613,7 +543,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
   }
 
-  let myRoutes = {
+  const myRoutes = {
 
     init: () => {
       myRoutes.get()
@@ -848,7 +778,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
         putData(host + '/routes' + '/' + routeId, { published: !routeIsPublished })
           .then(data => {
             let action = ((!routeIsPublished) ? 'published' : 'unpublished')
-            setAlert('The route ' + routeName + ' was succesfully ' + action + '!')
+            console.log('The route ' + routeName + ' was succesfully ' + action + '!')
           })
 
       },
@@ -880,7 +810,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
         putData(host + '/routes' + '/' + routeId, { published: !routeIsPublished })
           .then(data => {
             let action = ((!routeIsPublished) ? 'published' : 'unpublished')
-            setAlert('The route ' + routeName + ' was succesfully ' + action + '!')
+            console.log('The route ' + routeName + ' was succesfully ' + action + '!')
           })
 
       },
@@ -1015,7 +945,7 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
             myRoutes.place.postPlace(mapElement)
           }
         } else {
-          setAlert('Theres is not data to save about the place');
+          console.log('Theres is not data to save about the place');
           Draw.trash()
           setPlaceModalStatus(false)
         }
@@ -1081,10 +1011,43 @@ const MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter }) => 
 
   }
 
+  const states = {
+
+    init: () => { map.init() },
+
+    route: () => {
+      // Loar a route or reset draw...
+      drawer.reset()
+      if (route)
+        myRoutes.load(route)
+
+    },
+
+    center: () => {
+      // Set new map center
+      map.flyTo(center)
+    },
+
+    /*
+    routeId: (routeId) => { myRoutes.switch(routeId) },
+
+    routes: (routes) => {
+      //myRoutes.load(routes)
+    },
+    */
+
+  }
+
+  useEffect(() => { states.init() }, [])
+  useEffect(() => { states.route() }, [route])
+  useEffect(() => { states.center() }, [center])
+  //useEffect(() => { states.routeId(routeId) }, [routeId])
+  //useEffect(() => { states.routes(routes) }, [routes])
+
   return <div>
     <div ref={maparea} className='map-container' />
     <div className='nav-bar'>
-      Lat: {focus.lat.toFixed(2)} • Lng: {focus.lng.toFixed(2)} • Zoom: {Math.round(focus.zoom)}  • Mode: {mode}
+      Lat: {focus.lat.toFixed(2)} • Lng: {focus.lng.toFixed(2)} • Zoom: {Math.round(focus.zoom)} • Mode: {mode}{routeId > 0 && ' • Route: ' + routeId}
     </div>
   </div>
 
@@ -1134,10 +1097,10 @@ const [place, setPlace] = useState()
 const [qrUrl, setQrUrl] = useState(null) // QRCode for access this client ;)
 
 // New Place data
-const [alertModalStatus, setAlertModalStatus] = useState(false)
-const [alertModalMessage, setAlertModalMessage] = useState('')
-const [alertModalLabel, setAlertModalLabel] = useState('')
-const [alertContent, setAlertContent] = useState(null)
+const [alertModalStatus, console.logModalStatus] = useState(false)
+const [alertModalMessage, console.logModalMessage] = useState('')
+const [alertModalLabel, console.logModalLabel] = useState('')
+const [alertContent, console.logContent] = useState(null)
 const [placeId, setPlaceId] = useState(0)
 const [placeName, setPlaceName] = useState('')
 const [placeLabel, setPlaceLabel] = useState('')
@@ -1442,7 +1405,7 @@ let instr = {
       putData(host + '/routes' + '/' + routeId, { published: !routeIsPublished })
         .then(data => {
           let action = ((!routeIsPublished) ? 'published' : 'unpublished')
-          setAlert('The route ' + routeName + ' was succesfully ' + action + '!')
+          console.log('The route ' + routeName + ' was succesfully ' + action + '!')
         })
 
     },
@@ -1474,7 +1437,7 @@ let instr = {
       putData(host + '/routes' + '/' + routeId, { published: !routeIsPublished })
         .then(data => {
           let action = ((!routeIsPublished) ? 'published' : 'unpublished')
-          setAlert('The route ' + routeName + ' was succesfully ' + action + '!')
+          console.log('The route ' + routeName + ' was succesfully ' + action + '!')
         })
 
     },
@@ -1647,7 +1610,7 @@ let instr = {
           myRoutes.place.postPlace(mapElement)
         }
       } else {
-        setAlert('Theres is not data to save about the place');
+        console.log('Theres is not data to save about the place');
         Draw.trash()
         setPlaceModalStatus(false)
       }
@@ -1807,7 +1770,7 @@ maparea.current
 onDelete: (mapElement) => {
 
 if (routeIsPublished) {
-setAlert('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
+console.log('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
 return false
 }
 
@@ -1995,19 +1958,19 @@ console.log('routeId', routeId)
 },
 
 launchToast: (message, doContinue = false, label) => {
-setAlert(message, label)
+console.log(message, label)
 return doContinue
 },
 
-setAlert: (message, label = '', content = null) => {
-setAlertModalMessage(message)
-setAlertModalLabel(label)
-setAlertContent(content)
-setAlertModalStatus(true)
+console.log: (message, label = '', content = null) => {
+console.logModalMessage(message)
+console.logModalLabel(label)
+console.logContent(content)
+console.logModalStatus(true)
 },
 
 closeAlert: (message) => {
-setAlertModalStatus(false)
+console.logModalStatus(false)
 },
 
 alertModal: () => {

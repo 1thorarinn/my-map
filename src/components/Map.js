@@ -5,8 +5,8 @@ import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
 import 'react-tabs/style/react-tabs.css'
 import MapboxGL, { Map, FullscreenControl, GeolocateControl } from 'mapbox-gl'
 import jQuery from 'jquery'
-import { setStorage, removeStorage, getStorage, getData, Draw, deleteData, getCenter } from '../../map-utils.js'
-import { host, testing, mapboxToken } from '../../hob-const.js'
+import { setStorage, removeStorage, getStorage, getData, Draw, deleteData, getCenter } from '../map-utils.js'
+import { host, testing, mapboxToken } from '../hob-const.js'
 
 import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
@@ -50,7 +50,7 @@ const mapBoxDetails = {
 
 }
 
-let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selectedElement, setSelectedElement }) => {
+let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selectedElement, setSelectedElement, setActive, editor, setSummary }) => {
 
   // MAIN
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
@@ -61,7 +61,7 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
 
   // REFERENCES
   const maparea = useRef(null)
-  const [summary, setSummary] = useState(null)
+
   const [focus, setFocus] = useState(mapBoxDetails.defCenter)
 
   const map = {
@@ -105,11 +105,11 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
       // COMMON ACTIONS
       maparea.current.on('move', () => map.actions.sweep())
         .on('click', (e) => map.actions.click(e, Draw.getSelected()))
+        // Change the cursor to a pointer when the mouse is over the places layer.
+        // Change it back to a pointer when it leaves.
         .on('mouseenter', 'places', () => {
-          // Change the cursor to a pointer when the mouse is over the places layer.
           maparea.current.getCanvas().style.cursor = 'pointer'
         }).on('mouseleave', 'places', () => {
-          // Change it back to a pointer when it leaves.
           maparea.current.getCanvas().style.cursor = ''
         })
 
@@ -145,13 +145,7 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
 
       click: (e, selected) => {
 
-        var summary = {
-          draw: 'click',
-          action: '',
-          id: '',
-          type: 'mapClick',
-          selected: null
-        }
+        var summary = { }
 
         if (selected.features.length === 1) {
 
@@ -163,10 +157,27 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
             selected: selected.features[0]
           }
 
+          setActive(3)
+          setSelectedElement(summary)
+          setStorage('selected', selected)
+
+
+        } else {
+
+          summary = {
+            draw: 'click',
+            action: 'none',
+            id: 'none',
+            type: 'emptyClick',
+            selected: null
+          }
+
+          setActive(0)
+          setSelectedElement(undefined)          
+          removeStorage('selected')
+
         }
 
-        setSelectedElement(selected)
-        setStorage('selected', selected)
         console.log(summary)
 
       },
@@ -340,173 +351,32 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
       } else {
         if (testing) console.log('Uncontrolled action :// !!!' + mapElement.action)
       }
-    }
-
-  }
-
-  let process = useCallback((summary) => {
-    console.log('mode', route, mode)
-    /*switch (mode) {
-      case 'edition': {
-        drawer.onEdition(summary)
-      } break
-      default:
-      case 'creation': {
-        drawer.onCreate(summary)
-      } break
-    }*/
-  },[route, mode])
-
-  // All the draw actions
-  const draw = {
-
-    add: (e, draw) => {
-      let summary = {
-        draw: 'add',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
-        all: draw
-      }
-      process(summary)
     },
 
-    create: (e, draw) => {
-      let summary = {
-        draw: 'create',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
-        all: draw
-      }
-      process(summary)
-      /*
-      let route = parseInt(getStorage('routeId', 'string'))
-      
-      let type = mapElement.features[0].geometry.type
-      
-      if (type === 'Polygon') {
-        postData(host + '/polygons', {
-          'name': 'Polygon route ' + mapElement.features[0].id,
-          'creator': user_id,
-          'parent_route': route,
-          'element': mapElement.features[0].id,
-          'map_data': map.setMapData(mapElement.features[0])
-        })
-          .then(result => {
-            if (result.statusCode === 400) {
-              if (testing) console.log('Something was wrong creating a Polygon')
-            } else {
-              if (testing) console.log('The Polygon ' + mapElement.features[0].id + ' with the id ' + result.id + ' to the route ' + route + ' was succesfully created!!')
-            }
-          })
-      } else if (type === 'Point') {
-        // XXX: Call to a Places modal...
-        resetPlace(true);
-        setStorage('tmpPoint', mapElement.features[0], 'json')
-      }
-      */
-    },
+    controls: {
 
-    select: (e, draw) => {
-      let summary = {
-        draw: 'select',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
-        all: draw
-      }
-      process(summary)
-    },
+      create: '.mapbox-gl-draw_line',
 
-    update: (e, draw) => {
-      let summary = {
-        draw: 'update',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
-        all: draw
-      }
-      process(summary)
-      switch (mode) {
-        case 'edition': {
-          drawer.onEdition(e)
-        } break
-        default:
-        case 'creation': {
-          drawer.onCreate(e)
-        } break
-      }
-    },
+      edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon,.mapbox-gl-draw_trash',
 
-    delete: (e, draw) => {
+      creation: () => {
+        jQuery(editor.modes.controls.edit).fadeOut()
+        jQuery(editor.modes.controls.create).fadeIn()
+        editor.modes.setButtons(editor.buttons.delete, editor.buttons.publish)
+      },
 
-      let summary = {
-        draw: 'delete',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
-        all: draw
-      }
+      edition: (btn1, btn2) => {
+        jQuery(editor.modes.controls.create).fadeOut()
+        jQuery(editor.modes.controls.edit).fadeIn()
+        editor.modes.setButtons(btn1, btn2)
+      },
 
-      process(summary)
-
-      if (route.published) {
-        console.log('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
-        return false
-      }
-
-      var url = ''
-      var type = e.features[0].geometry.type
-      switch (type) {
-        case 'Point':
-          url = host + '/my-places'
-          break
-        case 'Polygon':
-          url = host + '/polygons'
-          break
-        case 'LineString':
-          url = host + '/routes'
-          break
-        default: break
-      }
-
-      if (type === 'Point') {
-        if (!window.confirm('ALERT:\nIf you delete this Place you will lose all the related content.\n\nDo you want to continue?')) {
-          return false
-        }
-      }
-
-      if (type === 'LineString') {
-        if (!window.confirm('ALERT:\nIf you delete this route you will must to put a new one.\n\nConsider first to edit the existent one.\n\nDo you want to continue?')) {
-          return false
-        }
-      }
-
-      let getUrl = url + '?element=' + e.features[0].id
-      console.log(getUrl)
-      return
-      getData(getUrl).then(response => {
-        var delUrl = url + '/' + response[0].id
-        deleteData(delUrl)
-          .then(data => {
-            if (data.statusCode === 400) {
-              if (testing) console.log('Something was wrong deleting a route element')
-            } else {
-              Draw.delete()
-              Draw.trash()
-              if (testing) console.log('The MapElement ' + e.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
-            }
-          })
-      })
     },
 
   }
+
+
+
 
   const modes = {
 
@@ -687,6 +557,15 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
     setRoute: (routeId) => {
       console.log('intento setear una ruta : ' + routeId)
     },
+
+    /*getDistanceBetweentwoGeopositions : ()=>{
+      let distance = 0
+      let points = route.geometry.coordinates
+      for(let i=0; i<points.length-1; i++){
+        distance += turf.distance(turf.point(points[i]), turf.point(points[i+1]))
+      }
+      return distance
+    },*/
 
     route: {
 
@@ -1010,6 +889,174 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
     }
 
   }
+  
+  // All the draw actions
+  const draw = {
+
+    add: (e, draw) => {
+      let summary = {
+        draw: 'add',
+        action: e.action,
+        id: e.features[0].id,
+        type: e.features[0].geometry.type,
+        data: e.features[0],
+        all: draw
+      }
+      process(summary)
+    },
+
+    create: (e, draw) => {
+      let summary = {
+        draw: 'create',
+        action: e.action,
+        id: e.features[0].id,
+        type: e.features[0].geometry.type,
+        data: e.features[0],
+        all: draw
+      }
+      process(summary)
+      /*
+      let route = parseInt(getStorage('routeId', 'string'))
+      
+      let type = mapElement.features[0].geometry.type
+      
+      if (type === 'Polygon') {
+        postData(host + '/polygons', {
+          'name': 'Polygon route ' + mapElement.features[0].id,
+          'creator': user_id,
+          'parent_route': route,
+          'element': mapElement.features[0].id,
+          'map_data': map.setMapData(mapElement.features[0])
+        })
+          .then(result => {
+            if (result.statusCode === 400) {
+              if (testing) console.log('Something was wrong creating a Polygon')
+            } else {
+              if (testing) console.log('The Polygon ' + mapElement.features[0].id + ' with the id ' + result.id + ' to the route ' + route + ' was succesfully created!!')
+            }
+          })
+      } else if (type === 'Point') {
+        // XXX: Call to a Places modal...
+        resetPlace(true);
+        setStorage('tmpPoint', mapElement.features[0], 'json')
+      }
+      */
+    },
+
+    select: (e, draw) => {
+      let summary = {
+        draw: 'select',
+        action: e.action,
+        id: e.features[0].id,
+        type: e.features[0].geometry.type,
+        data: e.features[0],
+        all: draw
+      }
+      process(summary)
+    },
+
+    update: (e, draw) => {
+      let summary = {
+        draw: 'update',
+        action: e.action,
+        id: e.features[0].id,
+        type: e.features[0].geometry.type,
+        data: e.features[0],
+        all: draw
+      }
+      process(summary)
+      /*switch (mode) {
+        case 'edition': {
+          drawer.onEdition(e)
+        } break
+        default:
+        case 'creation': {
+          drawer.onCreate(e)
+        } break
+      }*/
+    },
+
+    delete: (e, draw) => {
+
+      let summary = {
+        draw: 'delete',
+        action: e.action,
+        id: e.features[0].id,
+        type: e.features[0].geometry.type,
+        data: e.features[0],
+        all: draw
+      }
+
+      process(summary)
+
+      /*
+      if (route.published) {
+        console.log('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
+        return false
+      }
+
+      var url = ''
+      var type = e.features[0].geometry.type
+      switch (type) {
+        case 'Point':
+          url = host + '/my-places'
+          break
+        case 'Polygon':
+          url = host + '/polygons'
+          break
+        case 'LineString':
+          url = host + '/routes'
+          break
+        default: break
+      }
+
+      if (type === 'Point') {
+        if (!window.confirm('ALERT:\nIf you delete this Place you will lose all the related content.\n\nDo you want to continue?')) {
+          return false
+        }
+      }
+
+      if (type === 'LineString') {
+        if (!window.confirm('ALERT:\nIf you delete this route you will must to put a new one.\n\nConsider first to edit the existent one.\n\nDo you want to continue?')) {
+          return false
+        }
+      }
+
+      let getUrl = url + '?element=' + e.features[0].id
+      console.log(getUrl)
+      return
+      getData(getUrl).then(response => {
+        var delUrl = url + '/' + response[0].id
+        deleteData(delUrl)
+          .then(data => {
+            if (data.statusCode === 400) {
+              if (testing) console.log('Something was wrong deleting a route element')
+            } else {
+              Draw.delete()
+              Draw.trash()
+              if (testing) console.log('The MapElement ' + e.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
+            }
+          })
+      })
+      */
+    },
+
+  }
+
+  let process = useCallback((summary) => {
+    //console.log('mode', route, mode)
+    console.log(summary)
+    setSummary(summary)
+    /*switch (mode) {
+      case 'edition': {
+        drawer.onEdition(summary)
+      } break
+      default:
+      case 'creation': {
+        drawer.onCreate(summary)
+      } break
+    }*/
+  }, [route, mode])
 
   const states = {
 

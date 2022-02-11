@@ -177,7 +177,7 @@ li a:hover {
 .panel {
   background-color: #f0ebe1;
 }
-.panel__label {
+.panel-label {
   position: relative;
   display: block;
   width: 100%;
@@ -191,34 +191,35 @@ li a:hover {
   transition: color 0.2s linear;
   cursor: pointer;
 }
-.panel__label:focus {
+.panel-label:focus {
   outline: none;
 }
-.panel__label:after,
-.panel__label:before {
+.panel-label:after,
+.panel-label:before {
   content: '';
   position: absolute;
   right: 25px;
   top: 50%;
   width: 22px;
-  height: 5px;
-  margin-top: -5px;
+  height: 3px;
+  margin-top: -3px;
   background-color: #372717;
+  opacity: 0.5;
 }
-.panel__label:before {
+.panel-label:before {
   transform: rotate(-90deg);
   transition: transform 0.35s cubic-bezier(0.65, 0.05, 0.36, 1);
 }
 .panel[aria-expanded='true'] .panel__content {
   opacity: 1;
 }
-.panel[aria-expanded='true'] .panel__label {
+.panel[aria-expanded='true'] .panel-label {
   color: #957029;
 }
-.panel[aria-expanded='true'] .panel__label:before {
+.panel[aria-expanded='true'] .panel-label:before {
   transform: rotate(0deg);
 }
-.panel__inner {
+.panel-inner {
   overflow: hidden;
   will-change: height;
   transition: height 0.4s cubic-bezier(0.65, 0.05, 0.36, 1);

@@ -50,7 +50,20 @@ const mapBoxDetails = {
 
 }
 
-let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selectedElement, setSelectedElement, setActive, editor, setSummary }) => {
+let MyMap = ({
+  routeId,
+  route,
+  routes,
+  center,
+  mode,
+  setMode,
+  setCenter,
+  selectedElement,
+  setSelectedElement,
+  setActive,
+  editor,
+  setSummary
+}) => {
 
   // MAIN
   localStorage.setItem('STRAPI_UPDATE_NOTIF', true)
@@ -66,7 +79,7 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
 
   const map = {
 
-    init: async () => {
+    init: () => {
       let centerNow = center ? center : mapBoxDetails.defCenter
       if (!maparea) return
       let mapInit = {
@@ -374,9 +387,6 @@ let MyMap = ({ routeId, route, routes, center, mode, setMode, setCenter, selecte
     },
 
   }
-
-
-
 
   const modes = {
 

@@ -32,12 +32,13 @@ const Editor = () => {
   const [mainCenter, setMainCenter] = useState() // Is the calculated center, related with the routes created
 
   const [routes, setRoutes] = useState() // The loaded routes content related with this client...  
-  const [routeId, setRouteId] = useState(0)
   const [route, setRoute] = useState()
+  const [routeId, setRouteId] = useState(0)
+  const [routeName, setRouteName] = useState()
 
   const [selectedElement, setSelectedElement] = useState() // The selected route data
   const [summary, setSummary] = useState(null)
-  
+
   const [button1, setButton1] = useState()
   const [button2, setButton2] = useState()
   const [qrUrl, setQrUrl] = useState(null) // QRCode for access this client ;)
@@ -57,9 +58,11 @@ const Editor = () => {
       //setRouteId('245')
     },
 
-    launchOption: (e, type) => {
-      jQuery('.mapbox-gl-draw_' + type).click()
-      console.log(e.className)
+    launchOption: (type, index) => {
+      if (type) jQuery('.mapbox-gl-draw_' + type).click()
+      jQuery('.control-icon').removeClass('blink-slow')
+      jQuery('.control-' + index).addClass('blink-slow')
+      render.setActiveFold(index)
     },
 
     routes: {
@@ -71,8 +74,6 @@ const Editor = () => {
       },
 
       process: (routes) => {
-
-        if (!routes) return
 
         // Setting center...
         let routesCenter = getCenter(routes.data)
@@ -133,6 +134,8 @@ const Editor = () => {
           button2_1 = editor.buttons.publish
         }
         editor.modes.controls.edition(button1_1, button2_1)
+        jQuery('.control-icon').removeClass('blink-slow')
+        jQuery('.control-0').addClass('blink-slow')
         setActive(0)
       },
 
@@ -140,6 +143,7 @@ const Editor = () => {
         setMode('creation')
         setStorage('mode', 'creation')
         editor.modes.controls.creation()
+        jQuery('.control-icon').removeClass('blink-slow')
         setActive(-1)
       },
 
@@ -169,13 +173,15 @@ const Editor = () => {
 
         creation: () => {
           jQuery(editor.modes.controls.edit).fadeOut()
-          jQuery(editor.modes.controls.create).fadeIn()
+          //jQuery(editor.modes.controls.create).fadeIn()
+          jQuery(editor.modes.controls.create).fadeOut()
           editor.modes.setButtons(editor.buttons.delete, editor.buttons.publish)
         },
 
         edition: (btn1, btn2) => {
           jQuery(editor.modes.controls.create).fadeOut()
-          jQuery(editor.modes.controls.edit).fadeIn()
+          //jQuery(editor.modes.controls.edit).fadeIn()
+          jQuery(editor.modes.controls.edit).fadeOut()
           editor.modes.setButtons(btn1, btn2)
         },
 
@@ -224,7 +230,7 @@ const Editor = () => {
         disabled: true,
         visible: true,
         className: 'my-button',
-        onClick: (e) => { route.togglePublished() }
+        onClick: (e) => { route.publish() }
       },
 
       unpublish: {
@@ -233,14 +239,20 @@ const Editor = () => {
         disabled: false,
         visible: true,
         className: 'my-button',
-        onClick: (e) => { route.publish() }
+        onClick: (e) => { route.unpublish() }
       }
 
     },
 
-  }
+    actions: {
 
-  const [routeName, setRouteName] = useState()
+      deletePolygon: (polygon)=>{
+        console.log('- Action delete polygon', polygon)
+      }
+
+    }
+
+  }
 
   const setRouteNameAction = (name) => {
     let r = route
@@ -284,8 +296,8 @@ const Editor = () => {
           {route.polygons.map((polygon, index) =>
             <Option
               key={'option-.' + index}
-              onMouseOver={() => { console.log('selecting this polygon', polygon) }}
-              onClick={() => { console.log('- Clicking a panel polygon', polygon) }}
+              //onMouseOver={() => { console.log('selecting this polygon', polygon) }}
+              onClick={() => editor.actions.deletePolygon(polygon)}
               label={'Alert - ' + (index + 1)} margin="0 10px 6px 0"
             />
           )}
@@ -319,10 +331,13 @@ const Editor = () => {
     },
 
     setActiveFold: (index) => {
-      setActive(index === active ? '-1' : index)
+      let i = index === active ? '-1' : index
+      setActive(i)
+      jQuery('.control-icon').removeClass('blink-slow')
+      jQuery('.control-' + i).addClass('blink-slow')
     },
 
-    alertModal: (alert, onAccept, onCancel) => {
+    alertModal: (message, onAccept, onCancel) => {
       return (
         <Modal
           isOpen={true}
@@ -331,19 +346,19 @@ const Editor = () => {
           shouldCloseOnOverlayClick={true}
         >
           <div style={{ minHeight: '90%', textAlign: 'center' }}>
-            <Label htmlFor='input' style={{ color: 'white' }} message={''} />
-            <Label htmlFor='input' message={''} />
-            <div>{''}</div>
+            <Label htmlFor='input' style={{ color: 'white' }} message={message} />
+            <Label htmlFor='input' message={message} />
+            <div>{message}</div>
           </div>
           <Button
             label={'OK'}
             color={'warning'}
-            onClick={closeAlert}
+            onClick={()=>onAccept()}
           />
           <Button
             label={'Dismiss'}
             color={'error'}
-            onClick={closeAlert}
+            onClick={onCancel()}
           />
         </Modal>
       )
@@ -390,20 +405,19 @@ const Editor = () => {
               { count: route.polygons.length, isActive: true },
               { count: selectedElement !== undefined ? 1 : 0, isActive: selectedElement !== undefined }
             ] : null
-            return <li key={'inst-' + index}>
-              <div key={'inst-' + index} className='panel' role='tabpanel' aria-expanded={active === index}>
-                <button className='panel__label' role='tab' onClick={() => render.setActiveFold(index)}>
+            return <li key={'instruction-' + index}>
+              <div className='panel' role='tabpanel' aria-expanded={active === index}>
+                <button className='panel-label' role='tab' onClick={() => editor.launchOption(instr.action_class, index)}>
                   <div className='row'>
                     <div className='col-1' style={{ textAlign: 'center' }}>
                       <img src={host + instr.icon.url} alt=''
-                        className={'controls-' + index + ' controls-icon'}
-                        onClick={(e) => editor.launchOption(e, instr.action_class)}
+                        className={'control-' + index + ' control-icon'}
                         style={{ cursor: 'pointer', maxHeight: '35px' }}
                       />
                     </div>
-                    <div className='col-10'>
+                    <div className='col-9'>
                       <Label htmlFor='' className='advisory-label'>
-                        <span style={{ marginLeft: '10px' }}>{routes !== undefined ? instr.translations[0].title : instr.translations[0].title} </span>
+                        <span style={{ marginLeft: '10px' }}>{route !== undefined ? instr.translations[0].title : instr.translations[0].label} </span>
                       </Label>
                     </div>
                     <div className='col-1' style={{ paddingTop: '8px' }}>
@@ -411,7 +425,7 @@ const Editor = () => {
                     </div>
                   </div>
                 </button>
-                <div className='panel__inner' style={{ display: index === active ? 'block' : 'none' }} aria-hidden={!active !== index}>
+                <div className='panel-inner' style={{ display: index === active ? 'block' : 'none' }} aria-hidden={!active !== index}>
                   <div className='panel__content'>
                     <span style={{ marginLeft: '10px' }}>{instr.translations[0].description}</span>
                     {render.instructionForm(index)}
@@ -431,13 +445,11 @@ const Editor = () => {
               </Label>
             </div>
             <div className='col-1' style={{ paddingTop: '8px' }}>
-
             </div>
           </div>
         </div>
       </div>
       {/*<LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />*/}
-
     </div >
   </div >
 

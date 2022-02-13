@@ -86,7 +86,7 @@ export const alertModalStyle = {
 }
 
 export const messages = {
-    chooseRoute: 'Select to edit...'
+    chooseRoute: 'Select to edit or draw...'
 }
 
 // Checking stored LiveMap

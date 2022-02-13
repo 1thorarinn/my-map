@@ -60,9 +60,12 @@ let MyMap = ({
   setCenter,
   selectedElement,
   setSelectedElement,
+  active,
   setActive,
   editor,
-  setSummary
+  summary,
+  setSummary,
+  objRoutes
 }) => {
 
   // MAIN
@@ -174,7 +177,6 @@ let MyMap = ({
           setSelectedElement(summary)
           setStorage('selected', selected)
 
-
         } else {
 
           summary = {
@@ -185,7 +187,7 @@ let MyMap = ({
             selected: null
           }
 
-          setActive(0)
+          if(active!== 0){ setActive(0) }else{ setActive(-1)}
           setSelectedElement(undefined)          
           removeStorage('selected')
 
@@ -903,28 +905,36 @@ let MyMap = ({
   // All the draw actions
   const draw = {
 
-    add: (e, draw) => {
+    add: (element, draw) => {
       let summary = {
         draw: 'add',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
+        action: element.action,
+        id: element.features[0].id,
+        type: element.features[0].geometry.type,
+        data: element.features[0],
         all: draw
       }
-      process(summary)
+      setSummary(summary)
     },
 
-    create: (e, draw) => {
+    create: (element, draw) => {
+      console.log('routeId', routeId, 'mode', mode)
+
+      if(routeId > 0){
+        
+      }else{
+
+      }
+
       let summary = {
         draw: 'create',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
+        action: element.action,
+        id: element.features[0].id,
+        type: element.features[0].geometry.type,
+        data: element.features[0],
         all: draw
       }
-      process(summary)
+      setSummary(summary)
       /*
       let route = parseInt(getStorage('routeId', 'string'))
       
@@ -953,28 +963,28 @@ let MyMap = ({
       */
     },
 
-    select: (e, draw) => {
+    select: (element, draw) => {
       let summary = {
         draw: 'select',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
+        action: element.action,
+        id: element.features[0].id,
+        type: element.features[0].geometry.type,
+        data: element.features[0],
         all: draw
       }
       process(summary)
     },
 
-    update: (e, draw) => {
+    update: (element, draw) => {
       let summary = {
         draw: 'update',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
+        action: element.action,
+        id: element.features[0].id,
+        type: element.features[0].geometry.type,
+        data: element.features[0],
         all: draw
       }
-      process(summary)
+      setSummary(summary)
       /*switch (mode) {
         case 'edition': {
           drawer.onEdition(e)
@@ -986,14 +996,14 @@ let MyMap = ({
       }*/
     },
 
-    delete: (e, draw) => {
+    delete: (element, draw) => {
 
       let summary = {
         draw: 'delete',
-        action: e.action,
-        id: e.features[0].id,
-        type: e.features[0].geometry.type,
-        data: e.features[0],
+        action: element.action,
+        id: element.features[0].id,
+        type: element.features[0].geometry.type,
+        data: element.features[0],
         all: draw
       }
 
@@ -1006,7 +1016,7 @@ let MyMap = ({
       }
 
       var url = ''
-      var type = e.features[0].geometry.type
+      var type = element.features[0].geometry.type
       switch (type) {
         case 'Point':
           url = host + '/my-places'
@@ -1032,7 +1042,7 @@ let MyMap = ({
         }
       }
 
-      let getUrl = url + '?element=' + e.features[0].id
+      let getUrl = url + '?element=' + element.features[0].id
       console.log(getUrl)
       return
       getData(getUrl).then(response => {
@@ -1044,7 +1054,7 @@ let MyMap = ({
             } else {
               Draw.delete()
               Draw.trash()
-              if (testing) console.log('The MapElement ' + e.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
+              if (testing) console.log('The MapElement ' + element.features[0].id + ' with the id ' + data.id + ' was succesfully deleted!!')
             }
           })
       })
@@ -1053,20 +1063,7 @@ let MyMap = ({
 
   }
 
-  let process = useCallback((summary) => {
-    //console.log('mode', route, mode)
-    console.log(summary)
-    setSummary(summary)
-    /*switch (mode) {
-      case 'edition': {
-        drawer.onEdition(summary)
-      } break
-      default:
-      case 'creation': {
-        drawer.onCreate(summary)
-      } break
-    }*/
-  }, [route, mode])
+
 
   const states = {
 
@@ -1093,7 +1090,22 @@ let MyMap = ({
     },
     */
 
-  }
+  }  
+  
+  useEffect((summary) => {
+    //console.log('mode', route, mode)
+    console.log('summary', summary)
+    setSummary(summary)
+    /*switch (mode) {
+      case 'edition': {
+        drawer.onEdition(summary)
+      } break
+      default:
+      case 'creation': {
+        drawer.onCreate(summary)
+      } break
+    }*/
+  }, [summary])
 
   useEffect(() => { states.init() }, [])
   useEffect(() => { states.route() }, [route])
@@ -1796,14 +1808,14 @@ let map = {
 
     /*maparea.current.on('click', 'places', (e) => {
       // Copy coordinates array.
-      const coordinates = e.features[0].geometry.coordinates.slice();
-      const description = e.features[0].properties.description;
+      const coordinates = element.features[0].geometry.coordinates.slice();
+      const description = element.features[0].properties.description;
        
       // Ensure that if the map is zoomed out such that multiple
       // copies of the feature are visible, the popup appears
       // over the copy being pointed to.
-      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      while (Math.abs(element.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += element.lngLat.lng > coordinates[0] ? 360 : -360;
       }
        
       new mapboxgl.Popup()

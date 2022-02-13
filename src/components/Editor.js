@@ -375,8 +375,8 @@ const Editor = () => {
         mode={mode}
         route={route}
         center={center}
-        setMode={setMode}
         routeId={routeId}
+        setMode={setMode}
         setCenter={setCenter}
         setActive={setActive}
         selectedElement={selectedElement}

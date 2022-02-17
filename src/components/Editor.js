@@ -1,6 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef } from 'react'
 import { Select, Button, InputText, Textarea, Label, Option, Count } from '@buffetjs/core'
+import { Header } from '@buffetjs/custom'
 import { LoadingBar } from '@buffetjs/styles'
 
 import { host, testing, mapboxToken } from '../hob-const.js'
@@ -23,6 +24,12 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import 'react-responsive-carousel/lib/styles/carousel.min.css' // requires a loader
 
 import Alert from './Alert'
+import Instructions from './Instructions'
+
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faPen, faSave } from '@fortawesome/free-solid-svg-icons'
+
 
 //import { get, upperFirst } from 'lodash';
 //import { auth, LoadingIndicatorPage } from 'strapi-helper-plugin'
@@ -76,6 +83,7 @@ const Editor = () => {
   const [routes, setRoutes] = useState(undefined) // The loaded routes content related with this client...  
   const [routeId, setRouteId] = useState(0)
   const [routeName, setRouteName] = useState('')
+  const [editingName, setEditingName] = useState(false)
 
   const [selectedElement, setSelectedElement] = useState() // The selected route data
   const [summary, setSummary] = useState(undefined)
@@ -90,26 +98,29 @@ const Editor = () => {
   const [focus, setFocus] = useState(mapBoxDetails.defCenter)
   const [modal, setModal] = useState(undefined)
 
+  const [isLoading, setIsLoading] = useState(false)
+
   // REFERENCES
   const maparea = useRef(undefined)
 
   // TESTING
-  //const panojaContent = () => <label>asdfqwerqwe</label>
-  //const panojaOk = () => setModal({ show: false })
+  const panojaContent = () => <label>Panoja modal test</label>
+  const panojaOk = () => setModal({ show: false })
 
   const editor = {
 
     init: async () => {
+      if (!user_id) history.go(0)
+      setLoading(3000)
       map.init()
       editor.routes.set()
       editor.instructions.init()
       editor.modes.creation()
-      if (!user_id) history.go(0)
       localStorage.setItem('user_id', user_id)
       setQrUrl(host)
 
       // TESTING
-      //modalObj.set('Warning', panojaContent, panojaOk)
+      modalObj.set('Warning', panojaContent, panojaOk)
       //setRouteId(245)
 
     },
@@ -118,6 +129,8 @@ const Editor = () => {
       if (type) jQuery('.mapbox-gl-draw_' + type).click()
       jQuery('.control-icon').removeClass('blink-slow')
       jQuery('.control-' + index).addClass('blink-slow')
+      jQuery('.control-row').addClass('inactived')
+      jQuery('#control-row-' + index).removeClass('inactived')
       render.setActiveFold(index)
     },
 
@@ -149,6 +162,7 @@ const Editor = () => {
       },
 
       switch: (routeId) => {
+        setLoading(3000)
         if (routeId === 0) {
           // Clearing the routes
           setRoute(undefined)
@@ -185,28 +199,25 @@ const Editor = () => {
         myRoutes.load(route.data)
         setRouteId(route.data.id)
         setRouteName(route.data.name)
-        let button1_1 = editor.buttons.delete
+        let button1_1 = editor.buttons.delete()
         let button2_1 = null
         if (route.data.published) {
           button1_1.disabled = true
-          button2_1 = editor.buttons.unpublish
+          button2_1 = editor.buttons.unpublish()
         } else {
           button1_1.disabled = false
           button2_1 = editor.buttons.publish
         }
+        editor.setOption('lines', 0)
         editor.modes.controls.edition(button1_1, button2_1)
-        jQuery('.control-icon').removeClass('blink-slow')
-        jQuery('.control-0').addClass('blink-slow')
-        setActive(0)
       },
 
       creation: () => {
         setMode('creation')
         drawer.reset()
         setStorage('mode', 'creation')
+        editor.setOption('lines', 0)
         editor.modes.controls.creation()
-        jQuery('.control-icon').removeClass('blink-slow')
-        setActive(-1)
       },
 
       setButtons: (btn1, btn2) => {
@@ -232,19 +243,19 @@ const Editor = () => {
 
         create: '.mapbox-gl-draw_line',
 
-        edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon,.mapbox-gl-draw_trash',
+        edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon, .mapbox-gl-draw_trash',
 
         creation: () => {
           jQuery(editor.modes.controls.edit).fadeOut()
-          //jQuery(editor.modes.controls.create).fadeIn()
-          jQuery(editor.modes.controls.create).fadeOut()
+          jQuery(editor.modes.controls.create).fadeIn()
+          //jQuery(editor.modes.controls.create).fadeOut()
           editor.modes.setButtons(editor.buttons.delete, editor.buttons.publish)
         },
 
         edition: (btn1, btn2) => {
           jQuery(editor.modes.controls.create).fadeOut()
-          //jQuery(editor.modes.controls.edit).fadeIn()
-          jQuery(editor.modes.controls.edit).fadeOut()
+          jQuery(editor.modes.controls.edit).fadeIn()
+          //jQuery(editor.modes.controls.edit).fadeOut()
           editor.modes.setButtons(btn1, btn2)
         },
 
@@ -257,38 +268,16 @@ const Editor = () => {
     },
 
     buttons: {
-
-      set: (label, color, onClick, visible = false, disabled = false) => {
-        let r = {
-          label: label,
-          color: color,
-          disabled: disabled,
-          visible: true,
-          className: 'my-button'
-        }
-        if (onClick) r.onClick = onClick()
+      set: (label, color, onClick, visible = true, disabled = false) => {
+        let r = { label: label, color: color, disabled: disabled, visible: visible, className: 'my-button' }
+        if (onClick !== undefined) r.onClick = onClick
+        return r
       },
-
-      edit: (onEdit) => {
-        return editor.buttons.set('Edit', 'primary', onEdit)
-      },
-
-      save: (onSave) => {
-        return editor.buttons.set('Save', 'success', onSave)
-      },
-
-      delete: (onDelete) => {
-        return editor.buttons.set('Delete', 'delete', onDelete)
-      },
-
-      publish: (onPublish) => {
-        return editor.buttons.set('Publish', 'primary', onPublish)
-      },
-
-      unpublish: (onUnpublish) => {
-        return editor.buttons.set('Unpublish', 'success', onUnpublish)
-      }
-
+      edit: (onEdit) => editor.buttons.set('Edit', 'primary', onEdit),
+      save: (onSave) => editor.buttons.set('Save', 'success', onSave),
+      delete: (onDelete) => editor.buttons.set('Delete', 'delete', onDelete),
+      publish: (onPublish) => editor.buttons.set('Publish', 'primary', onPublish),
+      unpublish: (onUnpublish) => editor.buttons.set('Unpublish', 'success', onUnpublish)
     },
 
     actions: {
@@ -386,6 +375,9 @@ const Editor = () => {
       },
 
       click: (e, selected) => {
+
+        console.log(e, selected.features.lngLat)
+        //map.flyTo()
 
         var summary = {}
 
@@ -633,7 +625,7 @@ const Editor = () => {
 
       updateExtra: () => {
         if (!routeUnselected()) {
-          setIsLoading(true)
+          setLoading(2000)
           if (routeName !== '' && routeDescription !== '') {//&& routeLabel !== ''
             putData(host + '/routes' + '/' + routeId, {
               'name': routeName,
@@ -645,7 +637,7 @@ const Editor = () => {
             })
               .then()
           }
-          setIsLoading(false)
+          setLoading(2000)
         }
       },
 
@@ -948,21 +940,6 @@ const Editor = () => {
 
   }
 
-  const intrConst = async (dtype, element, draw, approved) => {
-    let summary = {
-      draw: dtype,
-      action: element.action,
-      id: element.features[0].id,
-      type: element.features[0].geometry.type,
-      data: element.features[0],
-      routeId: await getStorage('routeId'),
-      mode: await getStorage('mode'),
-      all: draw,
-      approved: approved
-    }
-    setSummary(summary)
-  }
-
   const drawer = {
 
     // Clean all the drawer
@@ -1168,6 +1145,21 @@ const Editor = () => {
 
   }
 
+  const intrConst = async (dtype, element, draw, approved) => {
+    let summary = {
+      draw: dtype,
+      action: element.action,
+      id: element.features[0].id,
+      type: element.features[0].geometry.type,
+      data: element.features[0],
+      routeId: await getStorage('routeId'),
+      mode: await getStorage('mode'),
+      all: draw,
+      approved: approved
+    }
+    setSummary(summary)
+  }
+
   // All the draw actions
   const draw = {
 
@@ -1182,11 +1174,11 @@ const Editor = () => {
       const panojaOk = () => setModal({ show: false })
       modalObj.set('Warning', panojaContent, panojaOk)
       
-
+ 
       if (routeId > 0) {
         modalObj.set('Warning', 'Yo cannot paint another route while editing a route...')
       }
-
+ 
       let route = parseInt(getStorage('routeId', 'string'))
       
       let type = mapElement.features[0].geometry.type
@@ -1242,7 +1234,7 @@ const Editor = () => {
         console.log('You cannot delete an element while a map is published.\n\nPlease, ubpublish before remove elements')
         return false
       }
-
+ 
       var url = ''
       var type = element.features[0].geometry.type
       switch (type) {
@@ -1257,19 +1249,19 @@ const Editor = () => {
           break
         default: break
       }
-
+ 
       if (type === 'Point') {
         if (!window.confirm('ALERT:\nIf you delete this Place you will lose all the related content.\n\nDo you want to continue?')) {
           return false
         }
       }
-
+ 
       if (type === 'LineString') {
         if (!window.confirm('ALERT:\nIf you delete this route you will must to put a new one.\n\nConsider first to edit the existent one.\n\nDo you want to continue?')) {
           return false
         }
       }
-
+ 
       let getUrl = url + '?element=' + element.features[0].id
       console.log(getUrl)
       return
@@ -1291,50 +1283,57 @@ const Editor = () => {
 
   }
 
+  const setLoading = (timeout = 2000) => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setIsLoading(false)
+    }, timeout)
+  }
+
+  useEffect(() => {
+    console.log(editingName)
+  }, [editingName])
+
   const render = {
 
     instructionForm: (index) => {
 
-      if (!route) return
-
       switch (index) {
 
         case 0: return <div className=''>
-          {/*<div style={{ display: 'block' }} className={instr.action_class}>{instr.description}</div>*/}
-
-          {/*routes && <div>
-            <Select
-              name='selected-route'
-              className='primary'
-              value={routeId ? routeId : '0'}
-              options={routes}
-              disabled={true}
-              closeMenuOnSelect={true}
-              onChange={({ target: { value } }) => setRouteId(parseInt(value))}>
-            </Select>
-          </div>*/}
-
           <div>
             <div className='row'>
-              <div className='col-md-12'>
-                <Label htmlFor='input' message='Route name' />
+              <div className='col-md-10'>
+                <Label htmlFor='input' message={routeId > 0 ? 'Route name' : 'Choose route'} />
+              </div>
+              <div className='col-md-2' style={{ padding: '3%', cursor: 'pointer', textAlign: 'right' }}>
+                {routeId !== 0 &&
+                  <FontAwesomeIcon
+                    icon={editingName ? faSave : faPen}
+                    onClick={() => editingName ? setEditingName(!editingName) : console.log('pinga')}
+                  />}
               </div>
             </div>
             <div className='row'>
               <div className='col-md-12'>
-                <InputText type='text' name='input'
-                  min='10'
-                  max='120'
-                  value={routeName}
-                  disabled='true'
-                  onChange={(e) => setRouteName(e.target.value)} />
+                {routes && !editingName
+                  ? routeSelector()
+                  : <InputText type='text' name='input'
+                    min='10'
+                    max='120'
+                    value={routeName}
+                    disabled={false}
+                    onChange={(e) => setRouteName(e.target.value)}
+                  />
+                }
+                <LoadingBar style={{ width: '100%', opacity: isLoading > 0 ? 99 : 0 }} />
               </div>
             </div>
           </div>
         </div>
 
         case 1: return <Carousel style={{ height: '100px' }}>
-          {route.places.map((place) =>
+          {route && route.places.map((place) =>
             <div className='row'>
               <div className='col-11' style={{ textAlign: 'left' }}>
                 <div style={{ display: 'block' }} className={place.name}>{place.description[0].label}</div>
@@ -1347,7 +1346,7 @@ const Editor = () => {
         </Carousel >
 
         case 2: return <div style={{ display: 'flex' }}>
-          {route.polygons.map((polygon, index) =>
+          {route && route.polygons.map((polygon, index) =>
             <Option
               key={'option-.' + index}
               //onMouseOver={() => { console.log('selecting this polygon', polygon) }}
@@ -1385,10 +1384,8 @@ const Editor = () => {
     },
 
     setActiveFold: (index) => {
-      let i = index === active ? '-1' : index
+      let i = index === active && index !== 0 ? '-1' : index
       setActive(i)
-      jQuery('.control-icon').removeClass('blink-slow')
-      jQuery('.control-' + i).addClass('blink-slow')
     },
 
     selectInstr: (type) => {
@@ -1437,6 +1434,32 @@ const Editor = () => {
 
   }
 
+  const routeSelector = () => {
+    return <div>
+      {routes && routes && <div>
+        <Select
+          name='selected-route'
+          className='primary'
+          value={routeId ? routeId : '0'}
+          options={routes}
+          closeMenuOnSelect={true}
+          onChange={({ target: { value } }) => setRouteId(parseInt(value))}>
+        </Select>
+      </div>}
+    </div>
+  }
+
+  const setRouteActive = (route,) => {
+    let countActive = route ? [
+      { count: route !== undefined ? 1 : 0, isActive: route !== null },
+      { count: route.places.length, isActive: route.places.length >= 1 },
+      { count: route.polygons.length, isActive: true },
+      { count: selectedElement !== undefined ? 1 : 0, isActive: selectedElement !== undefined },
+      { count: selectedElement !== undefined ? 1 : 0, isActive: selectedElement !== undefined }
+    ] : null
+    return countActive
+  }
+
   const states = {
     init: async () => editor.init(),
     routeId: () => editor.routes.switch(routeId),
@@ -1457,29 +1480,31 @@ const Editor = () => {
       </div>
     </div>
     <div className='col-4' style={{ padding: '0' }}>
-      {routes && <div>
-        <Select
-          name='selected-route'
-          className='primary'
-          value={routeId ? routeId : '0'}
-          options={routes}
-          closeMenuOnSelect={true}
-          onChange={({ target: { value } }) => setRouteId(parseInt(value))}>
-        </Select>
-      </div>}
       <div className=''>
+        {/*<Header
+          className='testeando'
+          style={{ width: '100%' }}
+          title={{
+            label: 'restaurant de Paris',
+            cta: {
+              icon: 'fa fa-pencil',
+              onClick: () => alert('Edit button clicked'),
+            },
+          }}
+          content="Restaurant description"
+        />*/}
+        {/*<Instructions route={route} instructions={instructions} render={render} active={active} editor={editor}/>*/}
         <ul>
           {instructions && instructions.data.map((instr, index) => {
-            let pinga = route ? [
-              { count: route !== undefined ? 1 : 0, isActive: route !== null },
-              { count: route.places.length, isActive: route.places.length >= 1 },
-              { count: route.polygons.length, isActive: true },
-              { count: selectedElement !== undefined ? 1 : 0, isActive: selectedElement !== undefined },
-              { count: selectedElement !== undefined ? 1 : 0, isActive: selectedElement !== undefined }
-            ] : null
+            let metadata = setRouteActive(route)
             return <li key={'instruction-' + index}>
               <div className='panel' role='tabpanel' aria-expanded={active === index}>
-                <button className='panel-label' role='tab' onClick={() => editor.setOption(instr.action_class, index)}>
+                <button
+                  id={'control-row-' + index}
+                  className={'panel-label control-row inactived'}
+                  role='tab'
+                  onClick={() => editor.setOption(instr.action_class, index)}
+                >
                   <div className='row'>
                     <div className='col-1' style={{ textAlign: 'center' }}>
                       <img src={host + instr.icon.url} alt=''
@@ -1489,11 +1514,13 @@ const Editor = () => {
                     </div>
                     <div className='col-9'>
                       <Label htmlFor='' className='advisory-label'>
-                        <span style={{ marginLeft: '10px' }}>{route !== undefined ? instr.translations[0].title : instr.translations[0].label} </span>
+                        <span style={{ marginLeft: '10px' }}>
+                          {route !== undefined ? instr.translations[0].title : instr.translations[0].label}
+                        </span>
                       </Label>
                     </div>
                     <div className='col-1' style={{ paddingTop: '8px' }}>
-                      {route && pinga[index].count > 0 && <Count {...pinga[index]} />}
+                      {route && metadata[index].count > 0 && <Count {...metadata[index]} />}
                     </div>
                   </div>
                 </button>
@@ -1509,7 +1536,6 @@ const Editor = () => {
         </ul>
       </div>
       {modal && <Alert {...modal} />}
-      {/*<LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />*/}
     </div >
   </div >
 

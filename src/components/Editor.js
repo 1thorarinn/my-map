@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Select, Button, InputText, Textarea, Label, Option, Count } from '@buffetjs/core'
 import { Header } from '@buffetjs/custom'
-import { LoadingBar } from '@buffetjs/styles'
+import { LoadingBar, LoadingIndicator } from '@buffetjs/styles'
 
 import { host, testing, mapboxToken } from '../hob-const.js'
 import Modal from 'react-modal'
@@ -100,6 +100,10 @@ const Editor = () => {
 
   const [isLoading, setIsLoading] = useState(false)
 
+  if (typeof (window) !== 'undefined') {
+    Modal.setAppElement('body')
+  }
+
   // REFERENCES
   const maparea = useRef(undefined)
 
@@ -113,14 +117,14 @@ const Editor = () => {
       if (!user_id) history.go(0)
       setLoading(3000)
       map.init()
-      editor.routes.set()
+      editor.routes.get()
       editor.instructions.init()
       editor.modes.creation()
       localStorage.setItem('user_id', user_id)
       setQrUrl(host)
 
       // TESTING
-      modalObj.set('Warning', panojaContent, panojaOk)
+      //modalObj.set('Warning', panojaContent, panojaOk)
       //setRouteId(245)
 
     },
@@ -136,13 +140,12 @@ const Editor = () => {
 
     routes: {
 
-      set: () => {
-        // Getting the routes hosted by the client...
-        let get = host + '/routes?creator=' + user_id
-        axios.get(get).then(editor.routes.process)
-      },
+      origin: host + '/routes?creator=' + user_id,
 
-      process: (routes) => {
+      // Getting and processing the routes hosted by the client...
+      get: () => axios.get(editor.routes.origin).then(editor.routes.set),
+
+      set: (routes) => {
 
         // Setting center...
         let routesCenter = getCenter(routes.data)
@@ -162,7 +165,7 @@ const Editor = () => {
       },
 
       switch: (routeId) => {
-        setLoading(3000)
+        setLoading(1500)
         if (routeId === 0) {
           // Clearing the routes
           setRoute(undefined)
@@ -175,17 +178,14 @@ const Editor = () => {
           let get = host + '/routes/' + routeId
           axios.get(get).then(editor.modes.edition)
         }
+        setStorage('routeId', routeId)
       },
 
       reload: () => {
-        if (routeId !== '0') {
-          // Getting the route...
-          let get = host + '/routes/' + routeId
-          axios.get(get).then(route => {
-            setRoute(route.data)
-          })
-        }
-      }
+        axios.get(host + '/routes/' + routeId).then(route => {
+          setRoutes(route.data)
+        })
+      },
 
     },
 
@@ -436,7 +436,7 @@ const Editor = () => {
       setMode('edition')
       drawer.reset()
       drawer.selected(route)
-      //myRoutes.setMarkers(route)// PAINTING COMMON POINTERS!!
+      //myRoutes.getMarkers(route)// PAINTING COMMON POINTERS!!
       let routeCenter = { lat: route.map_data.center_lat, lng: route.map_data.center_long, zoom: route.map_data.center_zoom }
       map.flyTo(routeCenter)
     },
@@ -463,14 +463,9 @@ const Editor = () => {
       setQrUrl(host)
     },
 
-    get: () => {
-      fetch(host + '/routes' + '?creator=' + user_id)
-        .then((routes) => routes.json())
-        .then(myRoutes.process)
-        .catch(error => { console.error(error) })
-    },
+    get: () => axios.get(host + '/routes' + '?creator=' + user_id).then(myRoutes.set),
 
-    process: (routes) => {
+    set: (routes) => {
       myRoutes.getCenter(routes)
       let options = [{ value: '0', label: messages.chooseRoute }]
       if (routes) {
@@ -503,7 +498,7 @@ const Editor = () => {
           let settedAction = action
             .replace('#route_id#', route.id.toString())
             .replace('#step#', (i++).toString())
-          myRoutes.setMarker(
+          myRoutes.getMarker(
             place.id,
             map,
             coords[0],
@@ -614,7 +609,29 @@ const Editor = () => {
 
       create: () => { },
 
-      update: () => { },
+      update: (type) => {
+        if (!editingName) setLoading(1500)
+        getStorage('routeId')
+          .then(routeId => {
+            if (!route) return
+            let onChangeName = !editingName && routeName !== route.name;
+            switch (type) {
+              case 'name': {
+                if (onChangeName) {
+                  let data = { "name": routeName }
+                  axios.put(host + '/routes/' + routeId, data)
+                    .then(myRoutes.route.reload)
+                    .then(console.log('The route was reloaded'))
+                    .then(editor.routes.get)
+                    .then(console.log('The routes were reloaded'))
+                }
+              } break;
+
+            }
+
+          })
+
+      },
 
       setRouteNameAction: (name) => {
         let r = route
@@ -749,6 +766,8 @@ const Editor = () => {
         document.querySelectorAll('.mapElement').forEach((el) => el.remove())
       },
 
+      reload: () => axios.get(host + '/routes/' + routeId).then(route => setRoute(route.data)),
+
       render: {
 
         routeForm: () => <div>
@@ -772,7 +791,6 @@ const Editor = () => {
             <span style={{ opacity: routeName ? 0 : 1 }}>Please, set a route name...</span>
           </div>
         </div>
-        ,
 
       }
 
@@ -798,71 +816,68 @@ const Editor = () => {
         }
       },
 
-      editModal: () => {
-        return (
-          <Modal
-            isOpen={false}
-            style={placesModalStyle}
-            contentLabel='Save your place'
-          >
-            <div className='table'>
-              <div className='row'>
-                <Label htmlFor='place-name'><h2>Set the place data</h2></Label>
-              </div>
-              <div className='row'>
-                <Label htmlFor='place-name'>Edit Place Name</Label>
-                <InputText
-                  type='text'
-                  name='place-name'
-                  className='my-input'
-                  value={placeName}
-                  placeholder='Set here the Place Name for this route...'
-                  required={true}
-                  style={{ width: '171%' }}
-                  onChange={({ target: { value } }) => { storePlaceName(value) }}
-                />
-              </div>
-              <div className='row'>
-                <span style={{ color: placeName ? 'white' : 'red' }}>Please, set a place name...</span>
-              </div>
-              <div className='row'>
-                <Label htmlFor='place-description'>Description</Label>
-                <Textarea
-                  name='route-description'
-                  className={'description'}
-                  placeholder='Set here the description for this place...'
-                  required={true}
-                  style={{ maxHeight: '261px', height: '261px' }}
-                  onChange={({ target: { value } }) => { storePlaceDescription(value) }}
-                  value={placeDescription}
-                />
-              </div>
-              <div className='row'>
-                <span style={{ color: placeDescription ? 'white' : 'red' }}>Please, set a place label...</span>
-              </div>
-              <div className='row'>
-                <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
-                <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-                  <Button
-                    label={'Save'}
-                    type='submit'
-                    onClick={savePlace}
-                    className='my-button'
-                  />
-                </div>
-                <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-                  <Button
-                    label={'Cancel'}
-                    color={'delete'}
-                    onClick={place.cancel}
-                    className='my-button'
-                  />
-                </div>
-              </div>
+      editModal: () => <Modal
+        isOpen={false}
+        style={placesModalStyle}
+        contentLabel='Save your place'
+      >
+        <div className='table'>
+          <div className='row'>
+            <Label htmlFor='place-name'><h2>Set the place data</h2></Label>
+          </div>
+          <div className='row'>
+            <Label htmlFor='place-name'>Edit Place Name</Label>
+            <InputText
+              type='text'
+              name='place-name'
+              className='my-input'
+              value={placeName}
+              placeholder='Set here the Place Name for this route...'
+              required={true}
+              style={{ width: '171%' }}
+              onChange={({ target: { value } }) => { storePlaceName(value) }}
+            />
+          </div>
+          <div className='row'>
+            <span style={{ color: placeName ? 'white' : 'red' }}>Please, set a place name...</span>
+          </div>
+          <div className='row'>
+            <Label htmlFor='place-description'>Description</Label>
+            <Textarea
+              name='route-description'
+              className={'description'}
+              placeholder='Set here the description for this place...'
+              required={true}
+              style={{ maxHeight: '261px', height: '261px' }}
+              onChange={({ target: { value } }) => { storePlaceDescription(value) }}
+              value={placeDescription}
+            />
+          </div>
+          <div className='row'>
+            <span style={{ color: placeDescription ? 'white' : 'red' }}>Please, set a place label...</span>
+          </div>
+          <div className='row'>
+            <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
+            <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+              <Button
+                label={'Save'}
+                type='submit'
+                onClick={savePlace}
+                className='my-button'
+              />
             </div>
-          </Modal>
-        )
-      },
+            <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+              <Button
+                label={'Cancel'}
+                color={'delete'}
+                onClick={place.cancel}
+                className='my-button'
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+      ,
 
       savePlace: (event) => {
         event.preventDefault()
@@ -1285,14 +1300,9 @@ const Editor = () => {
 
   const setLoading = (timeout = 2000) => {
     setIsLoading(true)
-    setTimeout(() => {
-      setIsLoading(false)
-    }, timeout)
+    setTimeout(() => setIsLoading(false), timeout)
   }
 
-  useEffect(() => {
-    console.log(editingName)
-  }, [editingName])
 
   const render = {
 
@@ -1307,22 +1317,21 @@ const Editor = () => {
                 <Label htmlFor='input' message={routeId > 0 ? 'Route name' : 'Choose route'} />
               </div>
               <div className='col-md-2' style={{ padding: '3%', cursor: 'pointer', textAlign: 'right' }}>
-                {routeId !== 0 &&
-                  <FontAwesomeIcon
-                    icon={editingName ? faSave : faPen}
-                    onClick={() => editingName ? setEditingName(!editingName) : console.log('pinga')}
-                  />}
+                {routeId > 0 && (!isLoading 
+                  ? <FontAwesomeIcon icon={editingName ? faSave : faPen} onClick={() => setEditingName(!editingName)} />
+                  : render.loaderInd())}
               </div>
             </div>
             <div className='row'>
               <div className='col-md-12'>
-                {routes && !editingName
+                {routes && !editingName && ! isLoading
                   ? routeSelector()
                   : <InputText type='text' name='input'
                     min='10'
                     max='120'
                     value={routeName}
-                    disabled={false}
+                    disabled={isLoading}
+                    placeholder='Loading...'
                     onChange={(e) => setRouteName(e.target.value)}
                   />
                 }
@@ -1395,7 +1404,16 @@ const Editor = () => {
         case 'Polygon': render.setActiveFold(2); break;
         default: render.setActiveFold(-1); break;
       }
-    }
+    },
+
+    loaderInd: (size) => <LoadingIndicator
+      animationTime="0.6s"
+      borderWidth="4px"
+      borderColor="#f3f3f3"
+      borderTopColor="#555555"
+      size={size + "px"}
+    />
+
 
   }
 
@@ -1463,11 +1481,13 @@ const Editor = () => {
   const states = {
     init: async () => editor.init(),
     routeId: () => editor.routes.switch(routeId),
-    summary: () => console.log('summary', summary)
+    summary: () => console.log('summary', summary),
+    editingName: () => myRoutes.route.update('name')
   }
 
   useEffect(states.init, [])
   useEffect(states.routeId, [routeId])
+  useEffect(states.editingName, [editingName])
   useEffect(states.summary, [summary])
 
   return <div className='row' style={{ padding: '0', overflowX: 'hidden' }}>

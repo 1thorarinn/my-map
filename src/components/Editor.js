@@ -610,20 +610,19 @@ const Editor = () => {
       create: () => { },
 
       update: (type) => {
-        if (!editingName) setLoading(1500)
+
         getStorage('routeId')
           .then(routeId => {
             if (!route) return
             let onChangeName = !editingName && routeName !== route.name;
+            if (onChangeName) setLoading(1500)
             switch (type) {
               case 'name': {
                 if (onChangeName) {
                   let data = { "name": routeName }
                   axios.put(host + '/routes/' + routeId, data)
                     .then(myRoutes.route.reload)
-                    .then(console.log('The route was reloaded'))
                     .then(editor.routes.get)
-                    .then(console.log('The routes were reloaded'))
                 }
               } break;
 
@@ -1317,14 +1316,18 @@ const Editor = () => {
                 <Label htmlFor='input' message={routeId > 0 ? 'Route name' : 'Choose route'} />
               </div>
               <div className='col-md-2' style={{ padding: '3%', cursor: 'pointer', textAlign: 'right' }}>
-                {routeId > 0 && (!isLoading 
-                  ? <FontAwesomeIcon icon={editingName ? faSave : faPen} onClick={() => setEditingName(!editingName)} />
+                {routeId > 0 && route && (!isLoading
+                  ? <FontAwesomeIcon
+                    icon={editingName ? faSave : faPen}
+                    color={route.name !== routeName ? '#ffc107' : '#212529'}
+                    onClick={() => setEditingName(!editingName)}
+                  />
                   : render.loaderInd())}
               </div>
             </div>
             <div className='row'>
               <div className='col-md-12'>
-                {routes && !editingName && ! isLoading
+                {routes && !editingName && !isLoading
                   ? routeSelector()
                   : <InputText type='text' name='input'
                     min='10'
@@ -1336,6 +1339,19 @@ const Editor = () => {
                   />
                 }
                 <LoadingBar style={{ width: '100%', opacity: isLoading > 0 ? 99 : 0 }} />
+                {route && <div>
+                  <div className='row'>
+                    <div className='col-md-12'>
+                      <label><b>• Created at:</b>
+                        {route.created_at}</label>
+                    </div>
+                  </div>
+                  {route.updated_at && <div className='row'>
+                    <div className='col-md-12'>
+                      <div><b>• Updated at:</b> {route.updated_at}</div>
+                    </div>
+                  </div>}
+                </div>}
               </div>
             </div>
           </div>

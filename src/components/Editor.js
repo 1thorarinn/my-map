@@ -80,6 +80,7 @@ const Editor = () => {
   const [mainCenter, setMainCenter] = useState() // Is the calculated center, related with the routes created
 
   const [route, setRoute] = useState(undefined) // The selected route
+  const [place, setPlace] = useState(undefined) // The selected place
   const [routes, setRoutes] = useState(undefined) // The loaded routes content related with this client...  
   const [routeId, setRouteId] = useState(0)
   const [routeName, setRouteName] = useState('')
@@ -797,9 +798,12 @@ const Editor = () => {
 
     place: {
 
-      create: () => { },
-
-      cancel: () => { },
+      get: async (element) => {
+        axios.get(host + '/my-places?element=' + element).then(result3 => {
+          setPlace(result3.data)
+          return result3.data
+        })
+      },
 
       cancel: () => {
         let mapElement = getStorage('tmpPoint', 'json')
@@ -815,68 +819,72 @@ const Editor = () => {
         }
       },
 
-      editModal: () => <Modal
-        isOpen={false}
-        style={placesModalStyle}
-        contentLabel='Save your place'
-      >
-        <div className='table'>
+      editModal: (place) => {        
+        modalObj.set(
+          'Set the place data',
+          () => myRoutes.place.editForm(place),
+          () => { console.log('- Saving the place'); },
+          placesModalStyle
+        )
+      },
+
+      editForm: (place) => {
+        return <div className='table'>
           <div className='row'>
-            <Label htmlFor='place-name'><h2>Set the place data</h2></Label>
+            <Label htmlFor='place-name'><h2></h2></Label>
           </div>
           <div className='row'>
-            <Label htmlFor='place-name'>Edit Place Name</Label>
-            <InputText
-              type='text'
-              name='place-name'
-              className='my-input'
-              value={placeName}
-              placeholder='Set here the Place Name for this route...'
-              required={true}
-              style={{ width: '171%' }}
-              onChange={({ target: { value } }) => { storePlaceName(value) }}
-            />
-          </div>
-          <div className='row'>
-            <span style={{ color: placeName ? 'white' : 'red' }}>Please, set a place name...</span>
-          </div>
-          <div className='row'>
-            <Label htmlFor='place-description'>Description</Label>
-            <Textarea
-              name='route-description'
-              className={'description'}
-              placeholder='Set here the description for this place...'
-              required={true}
-              style={{ maxHeight: '261px', height: '261px' }}
-              onChange={({ target: { value } }) => { storePlaceDescription(value) }}
-              value={placeDescription}
-            />
-          </div>
-          <div className='row'>
-            <span style={{ color: placeDescription ? 'white' : 'red' }}>Please, set a place label...</span>
-          </div>
-          <div className='row'>
-            <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
-            <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-              <Button
-                label={'Save'}
-                type='submit'
-                onClick={savePlace}
-                className='my-button'
-              />
-            </div>
-            <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
-              <Button
-                label={'Cancel'}
-                color={'delete'}
-                onClick={place.cancel}
-                className='my-button'
-              />
-            </div>
-          </div>
+          <Label htmlFor='place-name'>Edit Place Name</Label>
+          <InputText
+            type='text'
+            name='place-name'
+            className='my-input'
+            value={place.name}
+            placeholder='Set here the Place Name for this route...'
+            required={true}
+            style={{ width: '171%' }}
+            //onChange={({ target: { value } }) => { storePlaceName(value) }}
+          />
         </div>
-      </Modal>
-      ,
+        <div className='row'>
+          <span style={{ color: place.name ? 'white' : 'red' }}>Please, set a place name...</span>
+        </div>{/*
+        <div className='row'>
+          <Label htmlFor='place-description'>Description</Label>
+          <Textarea
+            name='route-description'
+            className={'description'}
+            placeholder='Set here the description for this place...'
+            required={true}
+            style={{ maxHeight: '261px', height: '261px' }}
+            onChange={({ target: { value } }) => { storePlaceDescription(value) }}
+            value={'asdfasdf'}
+          />
+        </div>
+        <div className='row'>
+          <span style={{ color: 'asdfasd' ? 'white' : 'red' }}>Please, set a place label...</span>
+        </div>
+        <div className='row'>
+          <LoadingBar style={{ width: '100%', opacity: isLoading ? 99 : 0 }} />
+          <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+            <Button
+              label={'Save'}
+              type='submit'
+              onClick={savePlace}
+              className='my-button'
+            />
+          </div>
+          <div className='col-6' style={{ textAlign: 'center', marginTop: '20px' }}>
+            <Button
+              label={'Cancel'}
+              color={'delete'}
+              onClick={place.cancel}
+              className='my-button'
+            />
+          </div>
+        </div>*/}
+      </div>
+      },
 
       savePlace: (event) => {
         event.preventDefault()
@@ -1302,7 +1310,6 @@ const Editor = () => {
     setTimeout(() => setIsLoading(false), timeout)
   }
 
-
   const render = {
 
     instructionForm: (index) => {
@@ -1342,8 +1349,7 @@ const Editor = () => {
                 {route && <div>
                   <div className='row'>
                     <div className='col-md-12'>
-                      <label><b>• Created at:</b>
-                        {route.created_at}</label>
+                      <label><b>• Created at:</b> {route.created_at}</label>
                     </div>
                   </div>
                   {route.updated_at && <div className='row'>
@@ -1351,24 +1357,34 @@ const Editor = () => {
                       <div><b>• Updated at:</b> {route.updated_at}</div>
                     </div>
                   </div>}
+                  <div className='row'>
+                    <div className='col-md-12'>
+                      <div><b>• Published:</b> {route.published ? 'yes' : 'no'}</div>
+                    </div>
+                  </div>
                 </div>}
               </div>
             </div>
           </div>
         </div>
 
-        case 1: return <Carousel style={{ height: '100px' }}>
-          {route && route.places.map((place) =>
-            <div className='row'>
-              <div className='col-11' style={{ textAlign: 'left' }}>
-                <div style={{ display: 'block' }} className={place.name}>{place.description[0].label}</div>
-                <div style={{ display: 'block' }} className={place.name}><img src={host + place.images[0].url} alt='' /></div>
-                <div style={{ display: 'block', height: '200px', overflowY: 'scroll' }} className={place.name}>{place.description[0].description}</div>
-                <Button {...editor.buttons.edit()} />
+        case 1:
+
+          return <Carousel style={{ height: '100px' }}>
+            {route && route.places.map((place) => {
+              const placeModal = () => myRoutes.place.editModal(place)              
+              let button = editor.buttons.edit(placeModal);
+              return <div className='row'>
+                <div className='col-11' style={{ textAlign: 'left' }}>
+                  <div style={{ display: 'block' }} className={place.name}>{place.description[0].label}</div>
+                  <div style={{ display: 'block' }} className={place.name}><img src={host + place.images[0].url} alt='' /></div>
+                  <div style={{ display: 'block', height: '200px', overflowY: 'scroll' }} className={place.name}>{place.description[0].description}</div>
+                  <Button {...button} />
+                </div>
               </div>
-            </div>
-          )}
-        </Carousel >
+            }
+            )}
+          </Carousel >
 
         case 2: return <div style={{ display: 'flex' }}>
           {route && route.polygons.map((polygon, index) =>
@@ -1429,7 +1445,6 @@ const Editor = () => {
       borderTopColor="#555555"
       size={size + "px"}
     />
-
 
   }
 

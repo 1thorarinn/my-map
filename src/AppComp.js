@@ -6,7 +6,7 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'react-responsive-carousel/lib/styles/carousel.min.css' // requires a loader
 
-import Editor from './components/Editor'
+import Editor from './components/Editor/index'
 import './index.css'
 
 const HomePage = () => {

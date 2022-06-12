@@ -4,15 +4,14 @@ import { Select, Button, InputText, Textarea, Label, Option, Count } from '@buff
 import { Header } from '@buffetjs/custom'
 import { LoadingBar, LoadingIndicator } from '@buffetjs/styles'
 
-import { host, testing, mapboxToken } from '../hob-const.js'
+import { host, testing, mapboxToken } from '../../hob-const.js'
 import Modal from 'react-modal'
 import axios from 'axios'
-import { Carousel } from 'react-responsive-carousel'
 import 'react-responsive-carousel/lib/styles/carousel.min.css'
 import 'react-tabs/style/react-tabs.css'
 import jQuery from 'jquery'
 import QRCode from 'qrcode.react'
-import { setStorage, getStorage, removeStorage, getData, getRoutesList, Draw, placesModalStyle, putData, deleteData, postData, getCenter, alertModalStyle } from '../map-utils.js';
+import { setStorage, getStorage, removeStorage, getData, getRoutesList, Draw, placesModalStyle, putData, deleteData, postData, getCenter, alertModalStyle } from '../../map-utils.js';
 
 import MapboxGL, { Map, FullscreenControl, GeolocateControl } from 'mapbox-gl'
 import MapboxGLGeocoder from '@mapbox/mapbox-gl-geocoder'
@@ -23,13 +22,11 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'react-responsive-carousel/lib/styles/carousel.min.css' // requires a loader
 
-import Alert from './Alert'
-import Instructions from './Instructions'
-
-
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPen, faSave } from '@fortawesome/free-solid-svg-icons'
-
+import Alert from '../Alert'
+//import Instructions from './Instructions'
+import Places from '../Places/index'
+import RouteEditor from '../RouteEditor/index'
+import PolygonEditor from '../PolygonEditor/index'
 
 //import { get, upperFirst } from 'lodash';
 //import { auth, LoadingIndicatorPage } from 'strapi-helper-plugin'
@@ -84,7 +81,6 @@ const Editor = () => {
   const [routes, setRoutes] = useState(undefined) // The loaded routes content related with this client...  
   const [routeId, setRouteId] = useState(0)
   const [routeName, setRouteName] = useState('')
-  const [editingName, setEditingName] = useState(false)
 
   const [selectedElement, setSelectedElement] = useState() // The selected route data
   const [summary, setSummary] = useState(undefined)
@@ -101,16 +97,10 @@ const Editor = () => {
 
   const [isLoading, setIsLoading] = useState(false)
 
-  if (typeof (window) !== 'undefined') {
-    Modal.setAppElement('body')
-  }
-
+  if (typeof (window) !== 'undefined') Modal.setAppElement('body')
+  
   // REFERENCES
   const maparea = useRef(undefined)
-
-  // TESTING
-  const panojaContent = () => <label>Panoja modal test</label>
-  const panojaOk = () => setModal({ show: false })
 
   const editor = {
 
@@ -123,13 +113,13 @@ const Editor = () => {
       editor.modes.creation()
       localStorage.setItem('user_id', user_id)
       setQrUrl(host)
-
+  
       // TESTING
       //modalObj.set('Warning', panojaContent, panojaOk)
       //setRouteId(245)
-
+  
     },
-
+  
     setOption: (type, index) => {
       if (type) jQuery('.mapbox-gl-draw_' + type).click()
       jQuery('.control-icon').removeClass('blink-slow')
@@ -138,33 +128,33 @@ const Editor = () => {
       jQuery('#control-row-' + index).removeClass('inactived')
       render.setActiveFold(index)
     },
-
+  
     routes: {
-
+  
       origin: host + '/routes?creator=' + user_id,
-
+  
       // Getting and processing the routes hosted by the client...
       get: () => axios.get(editor.routes.origin).then(editor.routes.set),
-
+  
       set: (routes) => {
-
+  
         // Setting center...
         let routesCenter = getCenter(routes.data)
         setCenter(routesCenter)
         map.flyTo(routesCenter)
-
+  
         // Also storing main center for later if back to no one menu...
         setMainCenter(routesCenter)
-
+  
         // Setting routes...
         let options = getRoutesList(routes.data)
         setRoutes(options)
-
+  
         // Setting mode...
         editor.modes.creation()
-
+  
       },
-
+  
       switch: (routeId) => {
         setLoading(1500)
         if (routeId === 0) {
@@ -181,17 +171,17 @@ const Editor = () => {
         }
         setStorage('routeId', routeId)
       },
-
+  
       reload: () => {
         axios.get(host + '/routes/' + routeId).then(route => {
           setRoutes(route.data)
         })
       },
-
+  
     },
-
+  
     modes: {
-
+  
       edition: (route) => {
         setMode('edition')
         setRoute(route.data)
@@ -212,7 +202,7 @@ const Editor = () => {
         editor.setOption('lines', 0)
         editor.modes.controls.edition(button1_1, button2_1)
       },
-
+  
       creation: () => {
         setMode('creation')
         drawer.reset()
@@ -220,12 +210,12 @@ const Editor = () => {
         editor.setOption('lines', 0)
         editor.modes.controls.creation()
       },
-
+  
       setButtons: (btn1, btn2) => {
         setButton1(btn1)
         setButton2(btn2)
       },
-
+  
       showCreationAdvisory: async () => {
         let routeId = getStorage('routeId')
         if (routeId === 0) {
@@ -239,35 +229,35 @@ const Editor = () => {
         }
         return true
       },
-
+  
       controls: {
-
+  
         create: '.mapbox-gl-draw_line',
-
+  
         edit: '.mapbox-gl-draw_point, .mapbox-gl-draw_polygon, .mapbox-gl-draw_trash',
-
+  
         creation: () => {
           jQuery(editor.modes.controls.edit).fadeOut()
           jQuery(editor.modes.controls.create).fadeIn()
           //jQuery(editor.modes.controls.create).fadeOut()
           editor.modes.setButtons(editor.buttons.delete, editor.buttons.publish)
         },
-
+  
         edition: (btn1, btn2) => {
           jQuery(editor.modes.controls.create).fadeOut()
           jQuery(editor.modes.controls.edit).fadeIn()
           //jQuery(editor.modes.controls.edit).fadeOut()
           editor.modes.setButtons(btn1, btn2)
         },
-
+  
       },
-
+  
     },
-
+  
     instructions: {
       init: async () => axios.get(host + '/instructions').then(setInstructions),
     },
-
+  
     buttons: {
       set: (label, color, onClick, visible = true, disabled = false) => {
         let r = { label: label, color: color, disabled: disabled, visible: visible, className: 'my-button' }
@@ -280,15 +270,15 @@ const Editor = () => {
       publish: (onPublish) => editor.buttons.set('Publish', 'primary', onPublish),
       unpublish: (onUnpublish) => editor.buttons.set('Unpublish', 'success', onUnpublish)
     },
-
+  
     actions: {
-
+  
       deletePolygon: (polygon) => {
         console.log('- Action delete polygon', polygon)
       }
-
+  
     }
-
+  
   }
 
   const map = {
@@ -461,7 +451,7 @@ const Editor = () => {
 
     init: () => {
       myRoutes.get()
-      setQrUrl(host)
+      //setQrUrl(host)
     },
 
     get: () => axios.get(host + '/routes' + '?creator=' + user_id).then(myRoutes.set),
@@ -593,10 +583,6 @@ const Editor = () => {
         })
     },
 
-    setRoute: (routeId) => {
-      console.log('intento setear una ruta : ' + routeId)
-    },
-
     /*getDistanceBetweentwoGeopositions : ()=>{
       let distance = 0
       let points = route.geometry.coordinates
@@ -610,20 +596,21 @@ const Editor = () => {
 
       create: () => { },
 
-      update: (type) => {
+      update: (type, value) => {
 
         getStorage('routeId')
           .then(routeId => {
             if (!route) return
             let onChangeName = !editingName && routeName !== route.name;
-            if (onChangeName) setLoading(1500)
+            if (onChangeName) setLoading()
             switch (type) {
               case 'name': {
                 if (onChangeName) {
-                  let data = { "name": routeName }
+                  let data = { "name": value }
                   axios.put(host + '/routes/' + routeId, data)
                     .then(myRoutes.route.reload)
                     .then(editor.routes.get)
+                    .then(setLoading(0))
                 }
               } break;
 
@@ -798,6 +785,8 @@ const Editor = () => {
 
     place: {
 
+      // Was copied to PlacesEditor
+
       get: async (element) => {
         axios.get(host + '/my-places?element=' + element).then(result3 => {
           setPlace(result3.data)
@@ -819,16 +808,18 @@ const Editor = () => {
         }
       },
 
-      editModal: (place) => {        
+      editModal: (place) => {      
+        let form = () => myRoutes.place.editForm(place)
+        let okAction = () => console.log('- Saving the place');
         modalObj.set(
           'Set the place data',
-          () => myRoutes.place.editForm(place),
-          () => { console.log('- Saving the place'); },
+          form,
+          okAction,
           placesModalStyle
         )
       },
 
-      editForm: (place) => {
+      /*editForm: (place) => {
         return <div className='table'>
           <div className='row'>
             <Label htmlFor='place-name'><h2></h2></Label>
@@ -847,8 +838,8 @@ const Editor = () => {
           />
         </div>
         <div className='row'>
-          <span style={{ color: place.name ? 'white' : 'red' }}>Please, set a place name...</span>
-        </div>{/*
+          <span style={{ color: place.name ? 'white' : 'red' }}>{place.name}</span>
+        </div>
         <div className='row'>
           <Label htmlFor='place-description'>Description</Label>
           <Textarea
@@ -882,9 +873,9 @@ const Editor = () => {
               className='my-button'
             />
           </div>
-        </div>*/}
+        </div>
       </div>
-      },
+      },*/
 
       savePlace: (event) => {
         event.preventDefault()
@@ -1306,6 +1297,10 @@ const Editor = () => {
   }
 
   const setLoading = (timeout = 2000) => {
+    if(timeout === false){
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     setTimeout(() => setIsLoading(false), timeout)
   }
@@ -1315,93 +1310,23 @@ const Editor = () => {
     instructionForm: (index) => {
 
       switch (index) {
+        case 0: return <RouteEditor
+            route={route}
+            routeId={routeId}
+            isLoading={isLoading}
+            render={render}
+            setLoading={setLoading}
+            myRoutes={myRoutes}
+            editor={editor}
+          />
 
-        case 0: return <div className=''>
-          <div>
-            <div className='row'>
-              <div className='col-md-10'>
-                <Label htmlFor='input' message={routeId > 0 ? 'Route name' : 'Choose route'} />
-              </div>
-              <div className='col-md-2' style={{ padding: '3%', cursor: 'pointer', textAlign: 'right' }}>
-                {routeId > 0 && route && (!isLoading
-                  ? <FontAwesomeIcon
-                    icon={editingName ? faSave : faPen}
-                    color={route.name !== routeName ? '#ffc107' : '#212529'}
-                    onClick={() => setEditingName(!editingName)}
-                  />
-                  : render.loaderInd())}
-              </div>
-            </div>
-            <div className='row'>
-              <div className='col-md-12'>
-                {routes && !editingName && !isLoading
-                  ? routeSelector()
-                  : <InputText type='text' name='input'
-                    min='10'
-                    max='120'
-                    value={routeName}
-                    disabled={isLoading}
-                    placeholder='Loading...'
-                    onChange={(e) => setRouteName(e.target.value)}
-                  />
-                }
-                <LoadingBar style={{ width: '100%', opacity: isLoading > 0 ? 99 : 0 }} />
-                {route && <div>
-                  <div className='row'>
-                    <div className='col-md-12'>
-                      <label><b>• Created at:</b> {route.created_at}</label>
-                    </div>
-                  </div>
-                  {route.updated_at && <div className='row'>
-                    <div className='col-md-12'>
-                      <div><b>• Updated at:</b> {route.updated_at}</div>
-                    </div>
-                  </div>}
-                  <div className='row'>
-                    <div className='col-md-12'>
-                      <div><b>• Published:</b> {route.published ? 'yes' : 'no'}</div>
-                    </div>
-                  </div>
-                </div>}
-              </div>
-            </div>
+        case 1: return <Places route={route} />
+        case 2: return <PolygonEditor route={route}/>
+
+        case 3: return <div>
+          <div className='row' style={{ fontSize: '0.8rem' }}>
+            {JSON.stringify(selectedElement)}
           </div>
-        </div>
-
-        case 1:
-
-          return <Carousel style={{ height: '100px' }}>
-            {route && route.places.map((place) => {
-              const placeModal = () => myRoutes.place.editModal(place)              
-              let button = editor.buttons.edit(placeModal);
-              return <div className='row'>
-                <div className='col-11' style={{ textAlign: 'left' }}>
-                  <div style={{ display: 'block' }} className={place.name}>{place.description[0].label}</div>
-                  <div style={{ display: 'block' }} className={place.name}><img src={host + place.images[0].url} alt='' /></div>
-                  <div style={{ display: 'block', height: '200px', overflowY: 'scroll' }} className={place.name}>{place.description[0].description}</div>
-                  <Button {...button} />
-                </div>
-              </div>
-            }
-            )}
-          </Carousel >
-
-        case 2: return <div style={{ display: 'flex' }}>
-          {route && route.polygons.map((polygon, index) =>
-            <Option
-              key={'option-.' + index}
-              //onMouseOver={() => { console.log('selecting this polygon', polygon) }}
-              onClick={() => draw.delete(polygon)}
-              label={'Alert - ' + (index + 1)} margin='0 10px 6px 0'
-            />
-          )}
-        </div>
-
-        case 3: return <div className='' style={{ fontSize: '0.8rem' }}>
-          {JSON.stringify(selectedElement)}
-        </div>
-
-        case 4: return <div>
           <div className='row'>
             <div className='col-sm-6 col-md-6 col-lg-6' style={{ textAlign: 'center' }}>
               {qrUrl && <QRCode value={qrUrl} />}
@@ -1419,7 +1344,6 @@ const Editor = () => {
             </div>
           </div>
         </div>
-
       }
 
     },
@@ -1444,7 +1368,22 @@ const Editor = () => {
       borderColor="#f3f3f3"
       borderTopColor="#555555"
       size={size + "px"}
-    />
+    />,
+
+    routeSelector: () => {
+      return <div>
+        {routes && routes && <div>
+          <Select
+            name='selected-route'
+            className='primary'
+            value={routeId ? routeId : '0'}
+            options={routes}
+            closeMenuOnSelect={true}
+            onChange={({ target: { value } }) => setRouteId(parseInt(value))}>
+          </Select>
+        </div>}
+      </div>
+    }
 
   }
 
@@ -1483,21 +1422,6 @@ const Editor = () => {
 
   }
 
-  const routeSelector = () => {
-    return <div>
-      {routes && routes && <div>
-        <Select
-          name='selected-route'
-          className='primary'
-          value={routeId ? routeId : '0'}
-          options={routes}
-          closeMenuOnSelect={true}
-          onChange={({ target: { value } }) => setRouteId(parseInt(value))}>
-        </Select>
-      </div>}
-    </div>
-  }
-
   const setRouteActive = (route,) => {
     let countActive = route ? [
       { count: route !== undefined ? 1 : 0, isActive: route !== null },
@@ -1513,12 +1437,10 @@ const Editor = () => {
     init: async () => editor.init(),
     routeId: () => editor.routes.switch(routeId),
     summary: () => console.log('summary', summary),
-    editingName: () => myRoutes.route.update('name')
   }
 
   useEffect(states.init, [])
   useEffect(states.routeId, [routeId])
-  useEffect(states.editingName, [editingName])
   useEffect(states.summary, [summary])
 
   return <div className='row' style={{ padding: '0', overflowX: 'hidden' }}>

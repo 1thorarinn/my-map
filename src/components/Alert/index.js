@@ -5,7 +5,7 @@ import { Button } from '@buffetjs/core'
 import Modal from 'react-modal'
 import 'react-responsive-carousel/lib/styles/carousel.min.css'
 import 'react-tabs/style/react-tabs.css'
-import { alertModalStyle } from '../map-utils.js'
+import { alertModalStyle } from '../../map-utils.js'
 
 import 'mapbox-gl/dist/mapbox-gl.css'
 import 'mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'

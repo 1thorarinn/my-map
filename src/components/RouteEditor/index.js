@@ -18,6 +18,8 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
 const RouteEditor = ({ routeId, route, isLoading, render, myRoutes, setLoading, editor }) => {
 
+  const [status, setStatus] = useState('default')
+
   const icons = { save: faSave, edit: faPen, loading: faPen }
   const [icon, setIcon] = useState('edit')
 
@@ -50,6 +52,7 @@ const RouteEditor = ({ routeId, route, isLoading, render, myRoutes, setLoading, 
             console.log('No editando nombre', routeName)
             let routeNameChanged = routeName !== route.name
             if(routeNameChanged){
+              console.log('Guardando nombre...')
               objRoute.update('name', routeName)
             }
           }
@@ -57,12 +60,10 @@ const RouteEditor = ({ routeId, route, isLoading, render, myRoutes, setLoading, 
       },
 
       setRouteName: ()=>{
-        if(route){
-          let routeNameChanged = routeName === route.name
-          setColor(routeNameChanged ? 'edited' : 'default')
-        }
+        if (!route) return
+        let routeNameChanged = routeName === route.name
+        setColor(routeNameChanged ? 'edited' : 'default')
       },
-
 
       update: (type, value) => {
         if (!route) return
@@ -73,13 +74,24 @@ const RouteEditor = ({ routeId, route, isLoading, render, myRoutes, setLoading, 
           case 'name': {
             if (onChangeName) {
               let data = { "name": value }
-              axios.put(host + '/routes/' + routeId, data)
+              axios.put(host + '/routes/' + route.id, data)
                 //.then(myRoutes.route.reload)
-                .then(editor.routes.get)
+                //.then(editor.routes.get)
                 .then(setLoading(0))
+                .then(()=>{ myRoutes.returnStatus(true) })
+                .catch((err)=>{  myRoutes.returnStatus(false)  })
             }
           } break;
+          default:
+            setLoading(0)
+            console.log('Say what?? o.o')
+            break;
         }
+      },
+
+      returnStatus: (result)=>{
+        if (!route) return
+        setColor(routeNameChanged ? 'edited' : 'default')
       }
 
     }
@@ -89,6 +101,7 @@ const RouteEditor = ({ routeId, route, isLoading, render, myRoutes, setLoading, 
   useEffect(()=> objRoute.load(), [objRoute, route])
   useEffect(()=> objRoute.editingName(), [editingName])
   useEffect(()=> objRoute.setRouteName(), [routeName])
+  useEffect(()=> objRoute.editingName(), [status])
 
   return <div className=''>
     <div>
